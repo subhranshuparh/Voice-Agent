@@ -57,11 +57,6 @@ class Assistant(Agent):
     def __init__(self) -> None:
         super().__init__(instructions=SYSTEM_PROMPT)
 
-    async def on_enter(self) -> None:
-        await self.session.generate_reply(
-            instructions="Greet the caller warmly in natural Hinglish. Introduce yourself as Aarogya Mitra for VoiceForBharat. State clearly: Main aapki hospital navigation, doctor visit prep, aur health schemes me sahayata kar sakta hu."
-        )
-
 
 server = AgentServer()
 

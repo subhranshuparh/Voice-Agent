@@ -47,7 +47,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
   const hdrs = await headers();
   const appConfig = await getAppConfig(hdrs);
   const styles = getStyles(appConfig);
-  const { pageTitle, pageDescription, companyName, logo, logoDark } = appConfig;
+  const { pageTitle, pageDescription } = appConfig;
 
   return (
     <html
@@ -63,6 +63,13 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         {styles && <style>{styles}</style>}
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
+        {/* Noto Sans Devanagari for Hindi text rendering */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
       </head>
       <body className="overflow-x-hidden">
         <ThemeProvider
@@ -71,31 +78,41 @@ export default async function RootLayout({ children }: RootLayoutProps) {
           enableSystem
           disableTransitionOnChange
         >
-          <header className="fixed top-0 left-0 z-50 hidden w-full flex-row justify-between p-6 md:flex">
-            <a
-              target="_blank"
-              rel="noopener noreferrer"
-              href="https://livekit.io"
-              className="scale-100 transition-transform duration-300 hover:scale-110"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logo} alt={`${companyName} Logo`} className="block size-6 dark:hidden" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={logoDark ?? logo}
-                alt={`${companyName} Logo`}
-                className="hidden size-6 dark:block"
-              />
-            </a>
-            <span className="text-foreground font-mono text-xs font-bold tracking-wider uppercase">
-              Built with{' '}
+          <header className="fixed top-0 left-0 z-50 flex w-full flex-row items-center justify-between p-4 md:p-6">
+            {/* Aarogya Mitra Logo & Brand */}
+            <div className="flex items-center gap-2.5">
+              {/* Health cross icon */}
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="text-primary"
+                >
+                  <path
+                    d="M8 2v4H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-4h4a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4V2a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2z"
+                    fill="currentColor"
+                    fillOpacity="0.9"
+                  />
+                </svg>
+              </div>
+              <span className="text-foreground text-sm font-semibold tracking-tight">
+                Aarogya Mitra
+              </span>
+            </div>
+
+            {/* Powered by badge */}
+            <span className="text-muted-foreground hidden font-mono text-[10px] font-bold tracking-wider uppercase md:block">
+              Powered by{' '}
               <a
                 target="_blank"
                 rel="noopener noreferrer"
-                href="https://docs.livekit.io/agents"
-                className="underline underline-offset-4"
+                href="https://murf.ai/api/docs/text-to-speech/streaming"
+                className="text-primary/80 underline underline-offset-4 transition-colors hover:text-primary"
               >
-                LiveKit Agents
+                Murf Falcon
               </a>
             </span>
           </header>

@@ -14,6 +14,39 @@ import { TileLayout } from './tile-view';
 
 const MotionMessage = motion.create(Shimmer);
 
+/** Maps the LiveKit agent state to a user-friendly status display. */
+function AgentStateIndicator({ state }: { state: string }) {
+  const stateConfig: Record<string, { label: string; icon: string; animate: boolean }> = {
+    listening: { label: 'Listening to you...', icon: '🎧', animate: true },
+    speaking: { label: 'Aarogya Mitra is speaking...', icon: '🗣️', animate: true },
+    thinking: { label: 'Thinking...', icon: '💭', animate: true },
+    idle: { label: 'Ready to help', icon: '💚', animate: false },
+    connecting: { label: 'Connecting...', icon: '🔗', animate: true },
+  };
+
+  const config = stateConfig[state] ?? stateConfig.idle;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mx-auto flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-4 py-1.5"
+    >
+      {config.animate && (
+        <motion.span
+          className="inline-block size-2 rounded-full bg-primary"
+          animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.1, 0.8] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        />
+      )}
+      {!config.animate && <span className="inline-block size-2 rounded-full bg-primary/50" />}
+      <span className="text-xs font-medium text-primary">
+        {config.icon} {config.label}
+      </span>
+    </motion.div>
+  );
+}
+
 const BOTTOM_VIEW_MOTION_PROPS: MotionProps = {
   variants: {
     visible: {
@@ -156,7 +189,7 @@ export interface AgentSessionView_01Props {
 }
 
 export function AgentSessionView_01({
-  preConnectMessage = 'Agent is listening, ask it a question',
+  preConnectMessage = 'Aarogya Mitra is ready — ask about health schemes, doctor visits, or wellness tips',
   supportsChatInput = true,
   supportsVideoInput = true,
   supportsScreenShare = true,
@@ -241,6 +274,10 @@ export function AgentSessionView_01({
         {...BOTTOM_VIEW_MOTION_PROPS}
         className="absolute inset-x-3 bottom-0 z-50 md:inset-x-12"
       >
+        {/* Agent state indicator — shows Listening / Speaking / Thinking */}
+        <div className="mx-auto mb-3 w-full max-w-2xl">
+          <AgentStateIndicator state={agentState} />
+        </div>
         {/* Pre-connect message */}
         {isPreConnectBufferEnabled && (
           <AnimatePresence>

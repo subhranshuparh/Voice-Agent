@@ -24,9 +24,54 @@ function toastAlert(toast: ToastProps) {
   );
 }
 
+/**
+ * Shows a user-friendly toast when microphone permission is denied.
+ * This is critical for a voice-based health assistant.
+ */
+function showMicrophonePermissionError() {
+  toastAlert({
+    title: 'Microphone Access Required',
+    description: (
+      <>
+        <p className="w-full">
+          Aarogya Mitra needs microphone access for your voice health consultation.
+        </p>
+        <p className="mt-2 w-full text-xs">
+          <strong>How to enable:</strong> Click the lock/camera icon in your browser&apos;s address
+          bar → Allow Microphone → Reload this page.
+        </p>
+      </>
+    ),
+  });
+}
+
 export function useAgentErrors() {
   const agent = useAgent();
   const { isConnected, end } = useSessionContext();
+
+  // Listen for microphone permission errors
+  useEffect(() => {
+    const handleDeviceError = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail;
+      if (detail?.error?.name === 'NotAllowedError' || detail?.error?.name === 'PermissionDeniedError') {
+        showMicrophonePermissionError();
+      }
+    };
+
+    // Also check for permission on connect
+    if (isConnected) {
+      navigator.mediaDevices
+        ?.getUserMedia({ audio: true })
+        .catch((err) => {
+          if (err.name === 'NotAllowedError' || err.name === 'NotFoundError') {
+            showMicrophonePermissionError();
+          }
+        });
+    }
+
+    window.addEventListener('deviceerror', handleDeviceError);
+    return () => window.removeEventListener('deviceerror', handleDeviceError);
+  }, [isConnected]);
 
   useEffect(() => {
     if (isConnected && agent.state === 'failed') {
@@ -45,13 +90,14 @@ export function useAgentErrors() {
             )}
             {reasons.length === 1 && <p className="w-full">{reasons[0]}</p>}
             <p className="w-full">
+              Please try again or{' '}
               <a
                 target="_blank"
                 rel="noopener noreferrer"
                 href="https://docs.livekit.io/agents/start/voice-ai/"
                 className="whitespace-nowrap underline"
               >
-                See quickstart guide
+                see the quickstart guide
               </a>
               .
             </p>

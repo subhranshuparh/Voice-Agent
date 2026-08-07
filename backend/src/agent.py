@@ -9,11 +9,10 @@ from livekit.agents import (
     JobContext,
     JobProcess,
     cli,
-    inference,
     room_io,
     tokenize,
 )
-from livekit.plugins import deepgram, murf, noise_cancellation, silero
+from livekit.plugins import deepgram, google, murf, noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 logger = logging.getLogger("agent")
@@ -79,16 +78,18 @@ async def my_agent(ctx: JobContext):
 
     # Set up a voice AI pipeline using Murf Falcon, Gemini, Deepgram, and the LiveKit turn detector
     session = AgentSession(
-        # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
+        # Speech-to-text (STT) — set "multi" to detect non-English transcripts (Hindi, Hinglish)
         # See all available models at https://docs.livekit.io/agents/models/stt/
-        stt=deepgram.STT(model="nova-3"),
-        # A Large Language Model (LLM) powered by LiveKit Inference (managed, no separate API quota needed)
-        llm=inference.LLM(
-            model="google/gemma-4-31b-it",
+        stt=deepgram.STT(model="nova-3", language="multi"),
+        # A Large Language Model (LLM) — Google Gemini for fast multilingual reasoning
+        # See all available models at https://docs.livekit.io/agents/models/llm/
+        llm=google.LLM(
+            model="gemini-3.5-flash-lite",
         ),
-        # Text-to-speech (TTS) powered by Murf Falcon
+        # Text-to-speech (TTS) — Murf Falcon with Anisha voice (auto-detects locale)
+        # See all available models as well as voice selections at https://docs.livekit.io/agents/models/tts/
         tts=murf.TTS(
-            voice="en-US-matthew",
+            voice="Anisha",
             style="Conversation",
             tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
             text_pacing=True,

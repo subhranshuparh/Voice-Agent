@@ -4,4 +4,8 @@
 .DS_Store
 agent-starter-react-main/
 agents-main/
+murf-cookbook-main/
+python-agents-examples-main/
 *.db
+backend/logs/
+

@@ -82,7 +82,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
             {/* Aarogya Mitra Logo & Brand */}
             <div className="flex items-center gap-2.5">
               {/* Health cross icon */}
-              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+              <div className="bg-primary/10 flex size-8 items-center justify-center rounded-lg">
                 <svg
                   width="18"
                   height="18"
@@ -110,7 +110,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 href="https://murf.ai/api/docs/text-to-speech/streaming"
-                className="text-primary/80 underline underline-offset-4 transition-colors hover:text-primary"
+                className="text-primary/80 hover:text-primary underline underline-offset-4 transition-colors"
               >
                 Murf Falcon
               </a>

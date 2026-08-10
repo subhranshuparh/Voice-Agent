@@ -76,8 +76,8 @@
 
 @theme inline {
   --font-sans:
-    var(--font-public-sans), 'Noto Sans Devanagari', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
-    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    var(--font-public-sans), 'Noto Sans Devanagari', ui-sans-serif, system-ui, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --font-mono:
     var(--font-commit-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     'Liberation Mono', 'Courier New', monospace;
@@ -126,13 +126,25 @@
 
 /* Aarogya Mitra — Custom Animations */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px oklch(0.55 0.15 170 / 20%); }
-  50% { box-shadow: 0 0 40px oklch(0.55 0.15 170 / 40%); }
+  0%,
+  100% {
+    box-shadow: 0 0 20px oklch(0.55 0.15 170 / 20%);
+  }
+  50% {
+    box-shadow: 0 0 40px oklch(0.55 0.15 170 / 40%);
+  }
 }
 
 @keyframes connecting-pulse {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.05); }
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
 }
 
 .animate-pulse-glow {

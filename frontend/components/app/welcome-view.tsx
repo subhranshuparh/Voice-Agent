@@ -4,9 +4,9 @@ function HealthIcon() {
   return (
     <div className="relative mb-6">
       {/* Outer glow ring */}
-      <div className="animate-pulse-glow absolute inset-0 rounded-full bg-primary/5" />
+      <div className="animate-pulse-glow bg-primary/5 absolute inset-0 rounded-full" />
       {/* Icon container */}
-      <div className="relative flex size-20 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
+      <div className="border-primary/20 bg-primary/10 relative flex size-20 items-center justify-center rounded-full border">
         {/* Stethoscope + heart icon */}
         <svg
           width="40"
@@ -82,14 +82,8 @@ export const WelcomeView = ({
         </p>
 
         {/* Language support badge */}
-        <div className="mt-4 flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            className="text-primary"
-          >
+        <div className="border-primary/20 bg-primary/5 mt-4 flex items-center gap-2 rounded-full border px-4 py-1.5">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-primary">
             <path
               d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
               stroke="currentColor"
@@ -102,16 +96,14 @@ export const WelcomeView = ({
               strokeWidth="1.5"
             />
           </svg>
-          <span className="text-primary text-xs font-medium">
-            Speaks English, Hindi & Hinglish
-          </span>
+          <span className="text-primary text-xs font-medium">Speaks English, Hindi & Hinglish</span>
         </div>
 
         {/* CTA Button */}
         <Button
           size="lg"
           onClick={onStartCall}
-          className="mt-8 w-72 rounded-full font-mono text-xs font-bold tracking-wider uppercase shadow-lg shadow-primary/20 transition-shadow hover:shadow-primary/30"
+          className="shadow-primary/20 hover:shadow-primary/30 mt-8 w-72 rounded-full font-mono text-xs font-bold tracking-wider uppercase shadow-lg transition-shadow"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="mr-2">
             <path

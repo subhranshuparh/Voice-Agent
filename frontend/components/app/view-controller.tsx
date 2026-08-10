@@ -46,14 +46,8 @@ function ConnectingView() {
       className="flex flex-col items-center justify-center gap-4"
     >
       {/* Pulsing health cross */}
-      <div className="animate-connecting-pulse flex size-16 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
-        <svg
-          width="28"
-          height="28"
-          viewBox="0 0 24 24"
-          fill="none"
-          className="text-primary"
-        >
+      <div className="animate-connecting-pulse border-primary/30 bg-primary/10 flex size-16 items-center justify-center rounded-full border">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-primary">
           <path
             d="M8 2v4H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-4h4a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4V2a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2z"
             fill="currentColor"
@@ -70,7 +64,7 @@ function ConnectingView() {
         {[0, 1, 2].map((i) => (
           <motion.div
             key={i}
-            className="size-2 rounded-full bg-primary"
+            className="bg-primary size-2 rounded-full"
             animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
             transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
           />
@@ -92,14 +86,8 @@ function CallEndedView({ onRestart }: { onRestart: () => void }) {
       className="flex flex-col items-center justify-center gap-4 px-6"
     >
       {/* Checkmark icon */}
-      <div className="flex size-16 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
-        <svg
-          width="28"
-          height="28"
-          viewBox="0 0 24 24"
-          fill="none"
-          className="text-primary"
-        >
+      <div className="border-primary/20 bg-primary/10 flex size-16 items-center justify-center rounded-full border">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-primary">
           <path
             d="M20 6L9 17L4 12"
             stroke="currentColor"
@@ -119,7 +107,7 @@ function CallEndedView({ onRestart }: { onRestart: () => void }) {
       <Button
         size="lg"
         onClick={onRestart}
-        className="mt-2 w-64 rounded-full font-mono text-xs font-bold tracking-wider uppercase shadow-lg shadow-primary/20"
+        className="shadow-primary/20 mt-2 w-64 rounded-full font-mono text-xs font-bold tracking-wider uppercase shadow-lg"
       >
         Start New Conversation
       </Button>

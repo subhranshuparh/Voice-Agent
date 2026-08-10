@@ -53,20 +53,21 @@ export function useAgentErrors() {
   useEffect(() => {
     const handleDeviceError = (event: Event) => {
       const detail = (event as CustomEvent)?.detail;
-      if (detail?.error?.name === 'NotAllowedError' || detail?.error?.name === 'PermissionDeniedError') {
+      if (
+        detail?.error?.name === 'NotAllowedError' ||
+        detail?.error?.name === 'PermissionDeniedError'
+      ) {
         showMicrophonePermissionError();
       }
     };
 
     // Also check for permission on connect
     if (isConnected) {
-      navigator.mediaDevices
-        ?.getUserMedia({ audio: true })
-        .catch((err) => {
-          if (err.name === 'NotAllowedError' || err.name === 'NotFoundError') {
-            showMicrophonePermissionError();
-          }
-        });
+      navigator.mediaDevices?.getUserMedia({ audio: true }).catch((err) => {
+        if (err.name === 'NotAllowedError' || err.name === 'NotFoundError') {
+          showMicrophonePermissionError();
+        }
+      });
     }
 
     window.addEventListener('deviceerror', handleDeviceError);

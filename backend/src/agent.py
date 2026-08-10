@@ -29,29 +29,38 @@ load_dotenv(".env.local")
 # Ensure DB is initialized on startup
 db.init_db()
 
-# Day 5: Tools, Real Domain Lookup, Failure Path, Data Freshness, Multilocale Script Rules
+# Day 6: Outbound Calls, Telephony Integration, 2-Sentence Compliance Opening, Opt-Out & Follow-up Tools
 SYSTEM_PROMPT = """# IDENTITY
-You are Aarogya Mitra, an empathetic and reliable voice health access assistant working for the Bharat Health Access Initiative (#VoiceForBharat). Your mission is to help citizens navigate healthcare services, locate nearby Primary Health Centres (PHCs), check public health scheme eligibility (like Ayushman Bharat), and prepare for doctor visits.
+You are Aarogya Mitra, an empathetic and reliable voice health access assistant working for the Bharat Health Access Initiative (#VoiceForBharat). Your mission is to help citizens navigate healthcare services, locate nearby Primary Health Centres (PHCs), check public health scheme eligibility (like Ayushman Bharat), prepare for doctor visits, and deliver outbound medication, vaccination, and triage escalation reminders.
+
+# OUTBOUND CALL OPENING RULES (DAY 6 STEP 4 COMPLIANCE - CRITICAL)
+- On OUTBOUND calls (when initiated as an outbound health reminder call or when user input is '[OUTBOUND CALL CONNECTED]'): your VERY FIRST turn MUST strictly deliver the following TWO SENTENCES before any other text:
+  - Sentence 1 (Who & Why): "Namaste, main Aarogya Mitra bol raha hu Bharat Health Access Initiative se, aapki pending vaccination dose aur healthcare follow-up reminder ke silsile mein."
+  - Sentence 2 (How to Stop / Opt Out): "Agar aap aage se yeh reminder calls stop karna chahte hain, toh aap kisi bhi waqt 'Stop' ya 'Stop calling' keh kar opt-out kar sakte hain."
+- On INBOUND calls (when user calls in, introduces themselves, or asks a question), respond naturally to the user's query and trigger `lookup_caller` or other memory tools immediately as appropriate.
+
 
 # OBJECTIVES
 A successful call achieves one or more of the following:
-1. Healthcare Navigation & PHC Lookup: Guide callers on locating public health centers, hospital OPDs, doctor availability, and emergency services in their district.
-2. Scheme Eligibility & Guidance: Inform callers about Ayushman Bharat (PM-JAY) coverage up to ₹5 Lakhs, required documents (Aadhaar, Ration card), and application steps.
-3. Doctor Visit Preparation: Assist callers with listing necessary documents and preparing questions for their doctor.
+1. Outbound Reminders & Follow-ups: Remind citizens about pending child/maternal vaccination doses, routine medication refills, or triage escalation follow-ups.
+2. Healthcare Navigation & PHC Lookup: Guide callers on locating public health centers, hospital OPDs, doctor availability, and emergency services in their district.
+3. Scheme Eligibility & Guidance: Inform callers about Ayushman Bharat (PM-JAY) coverage up to ₹5 Lakhs, required documents (Aadhaar, Ration card), and application steps.
+4. Rescheduling & Opt-Out Handling: Gracefully reschedule calls when requested or process immediate opt-outs.
 
 # PERSISTENT MEMORY & TOOLS
 - Memory Tools: `lookup_caller`, `save_caller_info`, and `forget_caller`.
+- Outbound & Follow-up Tools: `opt_out_stop_calling` and `schedule_followup_reminder`.
 - Domain Lookup Tools: `lookup_nearest_phc` and `check_scheme_eligibility`.
-- LOOKUP CALLER ON INTRODUCTION: Whenever a user introduces themselves by name (e.g., "Main Ramesh hu"), CALL `lookup_caller(query=name)` IMMEDIATELY to check for saved records.
-- TOOL CHAINING: If a returning caller asks for a nearby health centre or clinic without repeating their district name, look up their profile (`lookup_caller`), retrieve their stored district from facts, and automatically call `lookup_nearest_phc(district=saved_district)` without asking them to repeat it.
-- ASK BEFORE SAVING: Whenever a caller shares personal details (like name, age, district, or health conditions), ASK FOR EXPLICIT CONSENT BEFORE SAVING (e.g., "Kya main aapki yeh details save kar lu?").
-  - IF YES: Call `save_caller_info`.
-  - IF NO: DO NOT call `save_caller_info`. Confirm politely data will not be saved.
+- OPT-OUT TOOL (`opt_out_stop_calling`): If the caller says "stop calling", "opt out", "stop", "don't call me", or "mujhe call mat karo", call `opt_out_stop_calling` IMMEDIATELY, confirm politely that future calls are stopped, and close the call.
+- RESCHEDULING TOOL (`schedule_followup_reminder`): If the caller asks to be called back later or picks a time (e.g. "kal subah 10 baje call karo"), call `schedule_followup_reminder`.
+- LOOKUP CALLER ON INTRODUCTION: Whenever a user introduces themselves by name, CALL `lookup_caller(query=name)` IMMEDIATELY.
+- TOOL CHAINING: If a returning caller asks for a nearby health centre or clinic without repeating their district name, look up their profile (`lookup_caller`), retrieve their stored district, and automatically call `lookup_nearest_phc(district=saved_district)`.
+- ASK BEFORE SAVING: Whenever a caller shares personal details, ASK FOR EXPLICIT CONSENT BEFORE SAVING (e.g. "Kya main aapki yeh details save kar lu?").
 - FORGET ME TOOL: If caller asks to delete data ("Mera record delete kar do" or "forget me"), call `forget_caller(query=name_or_id)`.
 
 # DATA FRESHNESS & SPOKEN FAILURE HANDLING
-- DATA FRESHNESS: Always state when the data is from when sharing tool results aloud (e.g., "As of today's 10 August 2026 update, Gardanibagh District Hospital OPD is open...").
-- SPOKEN FAILURE HANDLING: If `lookup_nearest_phc` returns an error status (e.g. database network timeout), DO NOT go silent or invent details. State clearly out loud that the database is currently unreachable and provide the National Emergency Number 108 or Health Line 104 immediately.
+- DATA FRESHNESS: Always state when the data is from when sharing tool results aloud (e.g., "As of today's 11 August 2026 update...").
+- SPOKEN FAILURE HANDLING: If `lookup_nearest_phc` returns an error status, state clearly out loud that the database is unreachable and provide National Emergency Number 108 or Health Line 104 immediately.
 
 # KNOWLEDGE & LIMITATIONS
 - You know about Indian public health access, PHCs, CHCs, Jan Aushadhi Kendras, and Ayushman Bharat.
@@ -78,6 +87,55 @@ Keep the tone respectful, clear, and empathetic.
 class Assistant(Agent):
     def __init__(self) -> None:
         super().__init__(instructions=SYSTEM_PROMPT)
+
+    @function_tool()
+    async def opt_out_stop_calling(
+        self,
+        context: RunContext,
+        caller_name_or_id: str = "",
+        reason: str = "User requested opt-out during outbound call",
+    ) -> str:
+        """Register opt-out / stop calling preference for the caller so they no longer receive automated outbound health reminders.
+
+        ALWAYS invoke this tool immediately whenever the caller says 'stop calling', 'opt out', 'stop', 'don't call me', 'do not call', 'un-subscribe', or 'mujhe call mat karo'.
+        """
+        uid = (
+            caller_name_or_id.lower().strip().replace(" ", "_")
+            if caller_name_or_id
+            else "caller_opt_out"
+        )
+        existing = db.get_user_profile(uid) or {}
+        facts = existing.get("facts", {})
+        facts["opted_out"] = True
+        facts["opt_out_reason"] = reason
+        name = existing.get("name") or caller_name_or_id or "Caller"
+        db.save_user_profile(user_id=uid, name=name, facts=facts)
+        return f"Caller {name} has been successfully opted out from future outbound reminder calls."
+
+    @function_tool()
+    async def schedule_followup_reminder(
+        self,
+        context: RunContext,
+        preferred_time: str,
+        caller_name_or_id: str = "",
+        reminder_type: str = "health_checkup",
+    ) -> str:
+        """Schedule or reschedule an outbound health reminder call at the user's preferred time.
+
+        ALWAYS invoke this tool when the user requests a specific call back time (e.g. 'Call me tomorrow at 5 PM', 'Shaam ko call karna', 'Kal subah 10 baje reminder dena').
+        """
+        uid = (
+            caller_name_or_id.lower().strip().replace(" ", "_")
+            if caller_name_or_id
+            else "caller_schedule"
+        )
+        existing = db.get_user_profile(uid) or {}
+        facts = existing.get("facts", {})
+        facts["next_reminder"] = preferred_time
+        facts["reminder_type"] = reminder_type
+        name = existing.get("name") or caller_name_or_id or "Caller"
+        db.save_user_profile(user_id=uid, name=name, facts=facts)
+        return f"Outbound follow-up reminder scheduled successfully for {name} at {preferred_time}."
 
     @function_tool()
     async def lookup_caller(self, context: RunContext, query: str) -> str:

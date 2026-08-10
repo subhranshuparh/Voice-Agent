@@ -30,17 +30,17 @@ function AgentStateIndicator({ state }: { state: string }) {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mx-auto flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-4 py-1.5"
+      className="border-primary/15 bg-primary/5 mx-auto flex items-center gap-2 rounded-full border px-4 py-1.5"
     >
       {config.animate && (
         <motion.span
-          className="inline-block size-2 rounded-full bg-primary"
+          className="bg-primary inline-block size-2 rounded-full"
           animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.1, 0.8] }}
           transition={{ duration: 1.5, repeat: Infinity }}
         />
       )}
-      {!config.animate && <span className="inline-block size-2 rounded-full bg-primary/50" />}
-      <span className="text-xs font-medium text-primary">
+      {!config.animate && <span className="bg-primary/50 inline-block size-2 rounded-full" />}
+      <span className="text-primary text-xs font-medium">
         {config.icon} {config.label}
       </span>
     </motion.div>

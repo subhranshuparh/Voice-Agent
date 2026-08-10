@@ -270,6 +270,30 @@ For deeper documentation on each part, see:
 
 ---
 
+## Day 5 — The Tools (#VoiceForBharat Health Access Agent)
+
+For **Day 5 – The Tools**, **Aarogya Mitra** (Health Access Track) was enhanced with real-time health domain function tools:
+
+### Tools Implemented
+1. **`lookup_nearest_phc(district, pincode, simulate_failure)`**:
+   - Locates government Primary Health Centres (PHCs), Community Health Centres (CHCs), District Hospitals, OPD hours, doctor availability, bed counts, emergency 108 status, and helpline numbers.
+   - **Data Freshness (Step 5)**: Explicitly returns `data_timestamp` ("10 August 2026, 08:00 AM IST") which the agent speaks naturally aloud.
+   - **Spoken Failure Handling (Step 4)**: If network timeout or API outage occurs (`simulate_failure=True`), the tool returns structured error context, instructing the agent to speak a reassuring fallback with national emergency numbers (108 / 104) instead of remaining silent or hallucinating.
+2. **`check_scheme_eligibility(scheme_name, category)`**:
+   - Queries Ayushman Bharat (PM-JAY) coverage up to ₹5 Lakhs per family, eligibility criteria, required documents (Aadhaar, Ration Card), and application process.
+3. **Tool Chaining (Advanced)**:
+   - Connects with Day 4 SQLite caller memory (`lookup_caller`). If a returning user asks for a health facility without re-stating their district, the agent retrieves their saved location from memory and calls `lookup_nearest_phc` automatically.
+
+### Running Tool Tests
+```bash
+cd backend
+uv run pytest tests/test_tools.py
+uv run pytest tests/test_agent.py
+```
+
+---
+
 ## License
 
 MIT
+

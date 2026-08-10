@@ -8,7 +8,7 @@ from agent import Assistant
 
 
 def _llm() -> llm.LLM:
-    return google.LLM(model="gemini-2.5-flash")
+    return google.LLM(model="gemini-3.5-flash-lite")
 
 
 @pytest.mark.asyncio
@@ -148,4 +148,63 @@ async def test_grounding() -> None:
             )
         )
 
+        result.expect.no_more_events()
+
+
+@pytest.mark.asyncio
+async def test_auto_triggers_phc_lookup() -> None:
+    """Evaluation Day 5: Agent automatically calls lookup_nearest_phc tool when asked about hospitals/clinics in Patna."""
+    await asyncio.sleep(12)  # Avoid rate limiting
+    async with (
+        _llm() as llm_instance,
+        AgentSession(llm=llm_instance) as session,
+    ):
+        await session.start(Assistant())
+
+        result = await session.run(
+            user_input="Patna mein paas ka सरकारी Primary Health Centre (PHC) aur hospital batao."
+        )
+
+        result.expect.next_event().is_function_call(name="lookup_nearest_phc")
+        result.expect.next_event().is_function_call_output()
+        await (
+            result.expect.next_event()
+            .is_message(role="assistant")
+            .judge(
+                llm_instance,
+                intent="""
+                Provides details for Patna health facility (such as Kankarbagh UPHC or Gardanibagh hospital),
+                mentions OPD timing or doctor availability, and mentions when data was updated or data freshness.
+                """,
+            )
+        )
+        result.expect.no_more_events()
+
+
+@pytest.mark.asyncio
+async def test_scheme_eligibility_lookup() -> None:
+    """Evaluation Day 5: Agent automatically calls check_scheme_eligibility when asked about Ayushman Bharat card."""
+    await asyncio.sleep(12)  # Avoid rate limiting
+    async with (
+        _llm() as llm_instance,
+        AgentSession(llm=llm_instance) as session,
+    ):
+        await session.start(Assistant())
+
+        result = await session.run(
+            user_input="Ayushman Bharat card ki eligibility aur hospital cover kitna milta hai?"
+        )
+
+        result.expect.next_event().is_function_call(name="check_scheme_eligibility")
+        result.expect.next_event().is_function_call_output()
+        await (
+            result.expect.next_event()
+            .is_message(role="assistant")
+            .judge(
+                llm_instance,
+                intent="""
+                Explains Ayushman Bharat coverage (up to ₹5 Lakhs per family), required documents like Aadhaar Card or Ration Card, and how to apply.
+                """,
+            )
+        )
         result.expect.no_more_events()

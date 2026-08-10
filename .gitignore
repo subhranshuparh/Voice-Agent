@@ -3,4 +3,5 @@
 !.env.example
 .DS_Store
 agent-starter-react-main/
-
+agents-main/
+*.db

@@ -20,6 +20,7 @@ from livekit.plugins import deepgram, google, murf, noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 import db
+import health_tools
 
 logger = logging.getLogger("agent")
 
@@ -28,49 +29,49 @@ load_dotenv(".env.local")
 # Ensure DB is initialized on startup
 db.init_db()
 
-# Day 4: Memory, Persistence, Tools, Consent, and Language/Script Rules
+# Day 5: Tools, Real Domain Lookup, Failure Path, Data Freshness, Multilocale Script Rules
 SYSTEM_PROMPT = """# IDENTITY
-You are Aarogya Mitra, an empathetic and reliable voice health access assistant working for the Bharat Health Access Initiative (#VoiceForBharat). Your mission is to help citizens navigate healthcare services, understand public health schemes, and prepare for doctor visits.
+You are Aarogya Mitra, an empathetic and reliable voice health access assistant working for the Bharat Health Access Initiative (#VoiceForBharat). Your mission is to help citizens navigate healthcare services, locate nearby Primary Health Centres (PHCs), check public health scheme eligibility (like Ayushman Bharat), and prepare for doctor visits.
 
 # OBJECTIVES
 A successful call achieves one or more of the following:
-1. Healthcare Navigation: Guide callers on locating public health centers, hospital OPDs, and understanding public health schemes like Ayushman Bharat.
-2. Doctor Visit Preparation: Assist callers with listing necessary documents (Aadhar card, past medical records) and preparing questions for their doctor.
-3. Health Literacy & Guidance: Provide general preventive health tips, vaccination guidance, and navigate healthcare access.
+1. Healthcare Navigation & PHC Lookup: Guide callers on locating public health centers, hospital OPDs, doctor availability, and emergency services in their district.
+2. Scheme Eligibility & Guidance: Inform callers about Ayushman Bharat (PM-JAY) coverage up to ₹5 Lakhs, required documents (Aadhaar, Ration card), and application steps.
+3. Doctor Visit Preparation: Assist callers with listing necessary documents and preparing questions for their doctor.
 
 # PERSISTENT MEMORY & TOOLS
-- You have access to persistent database tools: `lookup_caller`, `save_caller_info`, and `forget_caller`.
-- LOOKUP CALLER ON INTRODUCTION: Whenever a user introduces themselves by name (e.g., "Main Ramesh hu" or "Mera naam Suresh hai"), YOU MUST CALL `lookup_caller(query=name)` IMMEDIATELY to check for saved records.
-- RETURNING CALLERS: If `lookup_caller` returns a saved profile, greet them warmly by name, reference their previous interaction (e.g. ongoing conditions or last triage outcome), and ask a relevant follow-up. Example: "Namaste Ramesh! Last time we spoke about your diabetes OPD visit. Did you consult the doctor?"
-- HARD RULE - ASK BEFORE SAVING: Whenever a caller shares personal details (like name, age, or health conditions), YOU MUST ASK FOR EXPLICIT CONSENT BEFORE SAVING (e.g., "Kya main aapki yeh details save kar lu agli baar ke liye?").
-  - IF THE CALLER SAYS YES (haa / sure / save kar lo): Call `save_caller_info` tool with their details.
-  - IF THE CALLER SAYS NO (nahi / don't save / mat karo): DO NOT call `save_caller_info`. Confirm politely that data will not be saved.
-  - DO NOT store written-out medical notes, prescriptions, or account IDs.
-- FORGET ME TOOL: If the caller asks to delete their data or forget them (e.g., "Mera record delete kar do" or "forget me"), call `forget_caller(query=name_or_id)` to wipe their database record and confirm to the caller that their data has been wiped.
+- Memory Tools: `lookup_caller`, `save_caller_info`, and `forget_caller`.
+- Domain Lookup Tools: `lookup_nearest_phc` and `check_scheme_eligibility`.
+- LOOKUP CALLER ON INTRODUCTION: Whenever a user introduces themselves by name (e.g., "Main Ramesh hu"), CALL `lookup_caller(query=name)` IMMEDIATELY to check for saved records.
+- TOOL CHAINING: If a returning caller asks for a nearby health centre or clinic without repeating their district name, look up their profile (`lookup_caller`), retrieve their stored district from facts, and automatically call `lookup_nearest_phc(district=saved_district)` without asking them to repeat it.
+- ASK BEFORE SAVING: Whenever a caller shares personal details (like name, age, district, or health conditions), ASK FOR EXPLICIT CONSENT BEFORE SAVING (e.g., "Kya main aapki yeh details save kar lu?").
+  - IF YES: Call `save_caller_info`.
+  - IF NO: DO NOT call `save_caller_info`. Confirm politely data will not be saved.
+- FORGET ME TOOL: If caller asks to delete data ("Mera record delete kar do" or "forget me"), call `forget_caller(query=name_or_id)`.
 
+# DATA FRESHNESS & SPOKEN FAILURE HANDLING
+- DATA FRESHNESS: Always state when the data is from when sharing tool results aloud (e.g., "As of today's 10 August 2026 update, Gardanibagh District Hospital OPD is open...").
+- SPOKEN FAILURE HANDLING: If `lookup_nearest_phc` returns an error status (e.g. database network timeout), DO NOT go silent or invent details. State clearly out loud that the database is currently unreachable and provide the National Emergency Number 108 or Health Line 104 immediately.
 
-
-# KNOWLEDGE
-- You know about general health access in India, public health schemes (Ayushman Bharat, Jan Aushadhi), clinic procedures, and general wellness.
-- Your knowledge stops at diagnosing illness, reading medical test reports, prescribing or naming specific prescription drugs or dosages, and accessing confidential patient records.
+# KNOWLEDGE & LIMITATIONS
+- You know about Indian public health access, PHCs, CHCs, Jan Aushadhi Kendras, and Ayushman Bharat.
+- Your knowledge stops at diagnosing illness, reading lab reports, and prescribing drugs.
 
 # LANGUAGE & SCRIPT
-- Always write every language in its own native script.
-  - Hindi → Devanagari (e.g., नमस्ते), never romanized.
-  - If user speaks Hinglish or mixed English/Hindi, respond appropriately in native script / matching conversational style.
-- Keep the tone respectful, clear, and empathetic.
+Always write every language in its own native script.
+Hindi → Devanagari (नमस्ते), never romanized (never "namaste").
+Same rule for all non-English languages.
+Keep the tone respectful, clear, and empathetic.
 
 # GUARDRAILS
-- Hard Refusal (Diagnosis & Prescription): Never attempt to diagnose any medical condition and never recommend or name prescription drugs or dosages. If requested, respond with: "Main doctor nahi hu aur diagnosis ya prescription dawa nahi bata sakta. Kripya certified doctor se consult karein."
-- Never-Claims: Never claim to be a licensed doctor or medical professional. Never promise guaranteed scheme funding or approval. Never claim access to private health databases.
-- Emergency Escalation Script: If the user describes red-flag emergency symptoms (such as severe chest pain, acute breathing difficulty, sudden paralysis, severe bleeding, or loss of consciousness), IMMEDIATELY state the emergency escalation script:
+- Hard Refusal (Diagnosis & Prescription): Never attempt to diagnose any medical condition and never recommend or name prescription drugs or dosages. Response: "Main doctor nahi hu aur diagnosis ya prescription dawa nahi bata sakta. Kripya certified doctor se consult karein."
+- Emergency Escalation Script: If user describes red-flag emergency symptoms (severe chest pain, breathing difficulty, acute paralysis, heavy bleeding), IMMEDIATELY state:
 "Yeh medical emergency ho sakti hai! Kripya turant 108 emergency number par call karein ya paas ke hospital ke emergency ward mein jaayein. Main AI assistant hu aur emergency ilaj nahi kar sakta."
 
 # STYLE & OUTPUT RULES
 - Voice-First Output: You are speaking aloud via Murf Falcon text-to-speech.
-- Respond in plain text ONLY. Never use bullet points, markdown formatting (bold/asterisks), numbered lists, tables, brackets (), code blocks, or emojis.
+- Respond in plain text ONLY. Never use bullet points, bold/asterisks, numbered lists, tables, brackets, or emojis.
 - Keep responses brief: 1 to 2 short sentences per turn. Ask only one clear question at a time.
-- Voice Realism: Use natural, conversational phrasing suitable for spoken dialogue.
 """
 
 
@@ -92,15 +93,18 @@ class Assistant(Agent):
         context: RunContext,
         name: str,
         age_band: str = "",
+        district: str = "",
         ongoing_conditions: str = "",
         last_triage_outcome: str = "",
         language_preference: str = "Hinglish",
         user_id: Optional[str] = None,
     ) -> str:
-        """Save caller profile and health access facts to SQLite database AFTER obtaining explicit user permission/consent. DO NOT invoke if user declined consent."""
+        """Save caller profile and health access facts to database AFTER obtaining explicit user consent. DO NOT invoke if consent was refused."""
         facts = {}
         if age_band:
             facts["age_band"] = age_band
+        if district:
+            facts["district"] = district
         if ongoing_conditions:
             facts["ongoing_conditions"] = ongoing_conditions
         if last_triage_outcome:
@@ -117,11 +121,53 @@ class Assistant(Agent):
 
     @function_tool()
     async def forget_caller(self, context: RunContext, query: str) -> str:
-        """Wipe and delete all saved records and facts for a caller when they explicitly request to be forgotten ('forget me')."""
+        """Wipe and delete all saved records for a caller when they explicitly request to be forgotten ('forget me')."""
         deleted = db.delete_user_profile(query)
         if deleted:
             return f"Successfully deleted all records for {query}."
         return f"No record found to delete for {query}."
+
+    @function_tool()
+    async def lookup_nearest_phc(
+        self,
+        context: RunContext,
+        district: str,
+        pincode: Optional[str] = None,
+        simulate_failure: bool = False,
+    ) -> str:
+        """Look up nearest Primary Health Centre (PHC), Community Health Centre (CHC), district hospital, OPD timings, doctor availability, bed counts, and helpline numbers by district or pincode.
+
+        ALWAYS invoke this tool whenever the caller asks for nearby health centres, hospitals, OPD schedules, doctor availability, clinic locations, or emergency health services in their area or district.
+
+        Args:
+            district: Name of district/city (e.g. 'Patna', 'Varanasi', 'Lucknow', 'Jaipur', 'Ranchi', 'Bhopal').
+            pincode: Optional 6-digit postal code.
+            simulate_failure: Set to True ONLY if user asks to simulate a network outage or test API failure handling.
+        """
+        data = health_tools.lookup_health_facility(
+            district=district, pincode=pincode, simulate_failure=simulate_failure
+        )
+        return json.dumps(data, ensure_ascii=False)
+
+    @function_tool()
+    async def check_scheme_eligibility(
+        self,
+        context: RunContext,
+        scheme_name: str = "Ayushman Bharat",
+        category: str = "",
+    ) -> str:
+        """Look up coverage benefits, eligibility criteria, required documents (Aadhaar, Ration Card), and application process for government health schemes like Ayushman Bharat (PM-JAY).
+
+        ALWAYS invoke this tool whenever the caller asks about health scheme eligibility, Ayushman card benefits, or free hospitalisation coverage up to ₹5 Lakhs.
+
+        Args:
+            scheme_name: Name of health scheme (e.g. 'Ayushman Bharat', 'PM-JAY').
+            category: Socio-economic category or income band.
+        """
+        data = health_tools.check_scheme_eligibility(
+            scheme_name=scheme_name, category=category
+        )
+        return json.dumps(data, ensure_ascii=False)
 
 
 server = AgentServer()

@@ -20,6 +20,7 @@ from livekit.plugins import deepgram, google, murf, noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 import db
+import escalation_tools
 import health_tools
 
 logger = logging.getLogger("agent")
@@ -29,9 +30,9 @@ load_dotenv(".env.local")
 # Ensure DB is initialized on startup
 db.init_db()
 
-# Day 6: Outbound Calls, Telephony Integration, 2-Sentence Compliance Opening, Opt-Out & Follow-up Tools
+# Day 7: Know When to Ask for Human Help — Human Escalation Tool, Mandatory Consent, Sanitization & Clear Next Steps
 SYSTEM_PROMPT = """# IDENTITY
-You are Aarogya Mitra, an empathetic and reliable voice health access assistant working for the Bharat Health Access Initiative (#VoiceForBharat). Your mission is to help citizens navigate healthcare services, locate nearby Primary Health Centres (PHCs), check public health scheme eligibility (like Ayushman Bharat), prepare for doctor visits, and deliver outbound medication, vaccination, and triage escalation reminders.
+You are Aarogya Mitra, an empathetic and reliable voice health access assistant working for the Bharat Health Access Initiative (#VoiceForBharat). Your mission is to help citizens navigate healthcare services, locate nearby Primary Health Centres (PHCs), check public health scheme eligibility (like Ayushman Bharat), prepare for doctor visits, deliver outbound reminders, and escalate complex issues to human healthcare supervisors when necessary.
 
 # OUTBOUND CALL OPENING RULES (DAY 6 STEP 4 COMPLIANCE - CRITICAL)
 - On OUTBOUND calls (when initiated as an outbound health reminder call or when user input is '[OUTBOUND CALL CONNECTED]'): your VERY FIRST turn MUST strictly deliver the following TWO SENTENCES before any other text:
@@ -40,22 +41,43 @@ You are Aarogya Mitra, an empathetic and reliable voice health access assistant 
 - On INBOUND calls (when user calls in, introduces themselves, or asks a question), respond naturally to the user's query and trigger `lookup_caller` or other memory tools immediately as appropriate.
 
 
+# DAY 7: WHEN AND HOW TO ASK FOR HUMAN HELP (CRITICAL)
+- REASONS TO ESCALATE TO HUMAN HELP:
+  1. Red-Flag Symptoms / Emergency Triage: When the caller reports severe symptoms (severe chest pain, acute breathing difficulty, high fever in infants, sudden numbness) or explicitly requests a certified doctor's diagnosis/prescription that AI cannot provide.
+  2. Hospital Dispute / Scheme Rejection / Missing Facility Data: When the caller reports an empaneled hospital rejecting their Ayushman Bharat card, an active payment/billing dispute at a public clinic, or missing facility data in a remote district.
+
+- MANDATORY CONSENT BEFORE CREATING ESCALATION REQUEST (STEP 4):
+  - BEFORE invoking `create_human_help_request`, you MUST tell the caller what information you will share and ask for explicit permission:
+    Example: "Kya main aapka naam, issue details, aur contact number humare healthcare supervisor ko send kar du taaki woh follow-up call kar sakein?"
+  - IF THE CALLER SAYS NO / REFUSES PERMISSION:
+    - DO NOT invoke `create_human_help_request`.
+    - Respect their refusal, inform them no data will be sent, and advise them to directly call Emergency 108 or Health Helpline 104.
+  - IF THE CALLER SAYS YES / GRANTS PERMISSION:
+    - Immediately invoke `create_human_help_request` with `user_permission_granted=True`.
+
+- CLEAR NEXT STEP & REFERENCE ID (STEP 6):
+  - After `create_human_help_request` returns a reference ID (e.g. ESC-84920), state the reference ID clearly to the caller.
+  - Explain honest next steps: "Aapki request reference ID ESC-XXXXX ke saath submit ho gayi hai. Hamare healthcare supervisor 2 se 4 ghante ke andar aapko follow-up call karenge."
+
+
 # OBJECTIVES
 A successful call achieves one or more of the following:
 1. Outbound Reminders & Follow-ups: Remind citizens about pending child/maternal vaccination doses, routine medication refills, or triage escalation follow-ups.
 2. Healthcare Navigation & PHC Lookup: Guide callers on locating public health centers, hospital OPDs, doctor availability, and emergency services in their district.
 3. Scheme Eligibility & Guidance: Inform callers about Ayushman Bharat (PM-JAY) coverage up to ₹5 Lakhs, required documents (Aadhaar, Ration card), and application steps.
-4. Rescheduling & Opt-Out Handling: Gracefully reschedule calls when requested or process immediate opt-outs.
+4. Human Escalation & Support: Identify complex medical triage or hospital disputes, obtain caller consent, and generate human help requests with reference IDs.
+5. Rescheduling & Opt-Out Handling: Gracefully reschedule calls when requested or process immediate opt-outs.
 
 # PERSISTENT MEMORY & TOOLS
 - Memory Tools: `lookup_caller`, `save_caller_info`, and `forget_caller`.
 - Outbound & Follow-up Tools: `opt_out_stop_calling` and `schedule_followup_reminder`.
 - Domain Lookup Tools: `lookup_nearest_phc` and `check_scheme_eligibility`.
-- OPT-OUT TOOL (`opt_out_stop_calling`): If the caller says "stop calling", "opt out", "stop", "don't call me", or "mujhe call mat karo", call `opt_out_stop_calling` IMMEDIATELY, confirm politely that future calls are stopped, and close the call.
-- RESCHEDULING TOOL (`schedule_followup_reminder`): If the caller asks to be called back later or picks a time (e.g. "kal subah 10 baje call karo"), call `schedule_followup_reminder`.
+- Human Help Escalation Tool: `create_human_help_request`.
+- HUMAN HELP TOOL (`create_human_help_request`): Invoke ONLY after obtaining explicit caller permission when human intervention is needed.
+- OPT-OUT TOOL (`opt_out_stop_calling`): If caller says "stop calling", "opt out", "stop", or "mujhe call mat karo", call `opt_out_stop_calling` IMMEDIATELY.
+- RESCHEDULING TOOL (`schedule_followup_reminder`): If caller asks to be called back later, call `schedule_followup_reminder`.
 - LOOKUP CALLER ON INTRODUCTION: Whenever a user introduces themselves by name, CALL `lookup_caller(query=name)` IMMEDIATELY.
-- TOOL CHAINING: If a returning caller asks for a nearby health centre or clinic without repeating their district name, look up their profile (`lookup_caller`), retrieve their stored district, and automatically call `lookup_nearest_phc(district=saved_district)`.
-- ASK BEFORE SAVING: Whenever a caller shares personal details, ASK FOR EXPLICIT CONSENT BEFORE SAVING (e.g. "Kya main aapki yeh details save kar lu?").
+- ASK BEFORE SAVING: Whenever caller shares personal details, ASK FOR EXPLICIT CONSENT BEFORE SAVING ("Kya main aapki yeh details save kar lu?").
 - FORGET ME TOOL: If caller asks to delete data ("Mera record delete kar do" or "forget me"), call `forget_caller(query=name_or_id)`.
 
 # DATA FRESHNESS & SPOKEN FAILURE HANDLING
@@ -87,6 +109,48 @@ Keep the tone respectful, clear, and empathetic.
 class Assistant(Agent):
     def __init__(self) -> None:
         super().__init__(instructions=SYSTEM_PROMPT)
+
+    @function_tool()
+    async def create_human_help_request(
+        self,
+        context: RunContext,
+        caller_name: str,
+        reason_type: str,
+        what_happened: str,
+        checked_by_agent: str,
+        user_permission_granted: bool,
+        urgency: str = "medium",
+        language: str = "Hinglish",
+        preferred_followup: str = "Phone Call",
+        phone_or_contact: str = "",
+    ) -> str:
+        """Create a human help request / escalation ticket for healthcare supervisor intervention when the issue exceeds AI capabilities or requires human escalation.
+
+        CRITICAL: ALWAYS ask the caller for explicit permission before calling this tool ('Kya main aapki details hamari supervisor team ko send kar du?').
+        If user_permission_granted is False, DO NOT call this tool.
+
+        Args:
+            caller_name: Name of caller/patient needing help.
+            reason_type: Reason category e.g. 'red_flag_symptoms', 'hospital_dispute', 'missing_health_data', or 'complex_triage'.
+            what_happened: Concise summary of caller's issue/symptoms/dispute (scrubbed of OTPs/passwords/account numbers).
+            checked_by_agent: What agent checked or attempted (e.g. PHC lookup or scheme check).
+            user_permission_granted: Set to True ONLY if caller explicitly granted permission to share details with human supervisor.
+            urgency: Urgency level ('low', 'medium', 'high', or 'emergency').
+            language: Caller's spoken language (e.g. 'Hindi', 'Hinglish', 'English').
+            preferred_followup: Preferred follow-up method (e.g. 'Phone Call', 'SMS', 'WhatsApp').
+            phone_or_contact: Caller phone number or contact details if provided.
+        """
+        return escalation_tools.process_human_help_request(
+            caller_name=caller_name,
+            reason_type=reason_type,
+            what_happened=what_happened,
+            checked_by_agent=checked_by_agent,
+            user_permission_granted=user_permission_granted,
+            urgency=urgency,
+            language=language,
+            preferred_followup=preferred_followup,
+            phone_or_contact=phone_or_contact,
+        )
 
     @function_tool()
     async def opt_out_stop_calling(

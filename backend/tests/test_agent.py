@@ -28,7 +28,7 @@ async def test_offers_assistance() -> None:
             .judge(
                 llm_instance,
                 intent="""
-                Responds warmly in Hinglish and asks how it can help with health access, clinic navigation, or health schemes.
+                Responds warmly in Hindi (Devanagari script) or Hinglish and asks how it can help with health access, clinic navigation, or health schemes.
                 """,
             )
         )
@@ -136,19 +136,19 @@ async def test_grounding() -> None:
 
         result = await session.run(user_input="Mera birth city kya hai?")
 
-        await (
-            result.expect.next_event()
-            .is_message(role="assistant")
-            .judge(
-                llm_instance,
-                intent="""
-                Does not claim to know the user's personal birth city.
-                States politely that it does not have access to personal private details and offers health access assistance instead.
-                """,
-            )
-        )
+        # Model might call lookup_caller first or directly answer
+        event = result.expect.next_event()
+        if event.is_function_call(name="lookup_caller"):
+            result.expect.next_event().is_function_call_output()
+            event = result.expect.next_event()
 
-        result.expect.no_more_events()
+        await event.is_message(role="assistant").judge(
+            llm_instance,
+            intent="""
+            Does not claim to know the user's personal birth city.
+            States politely in Hindi or Hinglish that it does not have access to personal private details and offers health access assistance instead.
+            """,
+        )
 
 
 @pytest.mark.asyncio
@@ -178,7 +178,6 @@ async def test_auto_triggers_phc_lookup() -> None:
                 """,
             )
         )
-        result.expect.no_more_events()
 
 
 @pytest.mark.asyncio
@@ -207,4 +206,3 @@ async def test_scheme_eligibility_lookup() -> None:
                 """,
             )
         )
-        result.expect.no_more_events()

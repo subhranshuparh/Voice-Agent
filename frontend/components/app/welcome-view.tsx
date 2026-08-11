@@ -99,29 +99,55 @@ export const WelcomeView = ({
           <span className="text-primary text-xs font-medium">Speaks English, Hindi & Hinglish</span>
         </div>
 
-        {/* CTA Button */}
-        <Button
-          size="lg"
-          onClick={onStartCall}
-          className="shadow-primary/20 hover:shadow-primary/30 mt-8 w-72 rounded-full font-mono text-xs font-bold tracking-wider uppercase shadow-lg transition-shadow"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="mr-2">
-            <path
-              d="M12 1C12 1 12 1 12 1C5.92487 1 1 5.92487 1 12C1 18.0751 5.92487 23 12 23C18.0751 23 23 18.0751 23 12"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            <path
-              d="M12 8V16M12 8L9 11M12 8L15 11"
+        {/* CTA Buttons */}
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Button
+            size="lg"
+            onClick={onStartCall}
+            className="shadow-primary/20 hover:shadow-primary/30 w-72 rounded-full font-mono text-xs font-bold tracking-wider uppercase shadow-lg transition-shadow"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="mr-2">
+              <path
+                d="M12 1C12 1 12 1 12 1C5.92487 1 1 5.92487 1 12C1 18.0751 5.92487 23 12 23C18.0751 23 23 18.0751 23 12"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M12 8V16M12 8L9 11M12 8L15 11"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {startButtonText}
+          </Button>
+
+          <a
+            href="/escalations"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-10 items-center justify-center rounded-full border border-neutral-700 bg-neutral-900/80 px-5 font-mono text-xs font-semibold tracking-wider text-neutral-300 uppercase transition hover:bg-neutral-800 hover:text-white"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
               stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-            />
-          </svg>
-          {startButtonText}
-        </Button>
+              className="mr-2 text-teal-400"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="M12 8v4" />
+              <path d="M12 16h.01" />
+            </svg>
+            Escalation Dashboard
+          </a>
+        </div>
 
         {/* Microphone hint */}
         <p className="text-muted-foreground mt-4 flex items-center gap-1.5 text-xs">

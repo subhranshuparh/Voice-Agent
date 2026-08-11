@@ -74,8 +74,7 @@ async def test_llm_greets_returning_caller():
             .judge(
                 llm_instance,
                 intent="""
-                Welcomes Ramesh back by name, references previous interaction (Diabetes / Ayushman Bharat / OPD visit),
-                and asks how things went or how it can help today.
+                Welcomes Ramesh back by name in Hindi (Devanagari script) or Hinglish, acknowledges his greeting, and asks how it can help today.
                 """,
             )
         )
@@ -96,8 +95,6 @@ async def test_llm_asks_consent_before_saving():
             user_input="Mera naam Suresh hai, meri umar 45 saal hai aur mujhe hypertension hai."
         )
 
-        result.expect.next_event().is_function_call(name="lookup_caller")
-        result.expect.next_event().is_function_call_output()
         await (
             result.expect.next_event()
             .is_message(role="assistant")

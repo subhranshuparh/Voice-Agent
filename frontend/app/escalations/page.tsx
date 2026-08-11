@@ -56,6 +56,10 @@ export default function EscalationDashboard() {
 
   useEffect(() => {
     fetchEscalations();
+    const interval = setInterval(() => {
+      fetchEscalations();
+    }, 3000);
+    return () => clearInterval(interval);
   }, [filterStatus]);
 
   const handleStatusChange = async (id: string, newStatus: string) => {

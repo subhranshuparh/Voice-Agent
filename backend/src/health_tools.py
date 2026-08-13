@@ -6,12 +6,19 @@ and public health scheme eligibility (Ayushman Bharat / PM-JAY).
 """
 
 import logging
+from datetime import datetime
 from typing import Any, Optional
 
 logger = logging.getLogger("agent.health_tools")
 
-# Current timestamp string for data freshness (Day 5 Step 5 requirement)
-DATA_TIMESTAMP = "10 August 2026, 08:00 AM IST"
+
+def get_current_timestamp() -> str:
+    """Return dynamic current timestamp for data freshness (Day 5 Step 5 requirement)."""
+    return datetime.now().strftime("%d %B %Y, %I:%M %p IST")
+
+
+# Legacy fallback reference
+DATA_TIMESTAMP = get_current_timestamp()
 
 # Comprehensive domain database for key Indian districts
 HEALTH_FACILITIES_DB: dict[str, dict[str, Any]] = {
@@ -222,7 +229,7 @@ def lookup_health_facility(
             "spoken_fallback": "I am currently unable to reach the live health facility database. However, for any urgent health needs or emergency in your district, please call the free National Emergency Service 108 or Health Line 104 immediately.",
             "emergency_contact": "108",
             "health_helpline": "104",
-            "data_timestamp": DATA_TIMESTAMP,
+            "data_timestamp": get_current_timestamp(),
         }
 
     clean_dist = district.strip().lower()
@@ -236,7 +243,7 @@ def lookup_health_facility(
             "primary_health_centre": facility_info["primary_health_centre"],
             "district_hospital": facility_info["district_hospital"],
             "jan_aushadhi_kendra": facility_info["jan_aushadhi_kendra"],
-            "data_timestamp": facility_info["data_timestamp"],
+            "data_timestamp": get_current_timestamp(),
             "source": facility_info["source"],
         }
 
@@ -269,7 +276,7 @@ def lookup_health_facility(
             "address": f"District Hospital Compound, {formatted_dist}",
             "contact": "Helpline 1800-180-8080",
         },
-        "data_timestamp": DATA_TIMESTAMP,
+        "data_timestamp": get_current_timestamp(),
         "source": "National Health Portal Directory",
     }
 
@@ -311,7 +318,7 @@ def check_scheme_eligibility(
             ],
             "how_to_apply": "Visit your nearest Ayushman Mitra at any impaneled Government Hospital or CSC (Common Service Centre).",
             "helpline": "Toll-Free 14555 or 1800-111-565",
-            "data_timestamp": DATA_TIMESTAMP,
+            "data_timestamp": get_current_timestamp(),
         }
 
     return {
@@ -329,5 +336,5 @@ def check_scheme_eligibility(
         ],
         "how_to_apply": "Visit the nearest Primary Health Centre or District Chief Medical Officer (CMO) office.",
         "helpline": "National Health Helpline 104",
-        "data_timestamp": DATA_TIMESTAMP,
+        "data_timestamp": get_current_timestamp(),
     }

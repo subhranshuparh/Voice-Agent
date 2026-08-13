@@ -17,10 +17,11 @@ export async function GET(request: Request) {
     const escalations = JSON.parse(stdout.trim() || '[]');
 
     return NextResponse.json({ escalations });
-  } catch (error: any) {
-    console.error('Error fetching escalations:', error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error in escalation endpoint:', err);
     return NextResponse.json(
-      { error: 'Failed to fetch escalations', details: error.message },
+      { error: 'Escalation operation failed', details: err.message },
       { status: 500 }
     );
   }
@@ -42,10 +43,11 @@ export async function POST(request: Request) {
     const result = JSON.parse(stdout.trim() || '{"success": false}');
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error updating escalation status:', error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error updating escalation status:', err);
     return NextResponse.json(
-      { error: 'Failed to update escalation status', details: error.message },
+      { error: 'Failed to update escalation status', details: err.message },
       { status: 500 }
     );
   }

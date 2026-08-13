@@ -82,7 +82,7 @@ A successful call achieves one or more of the following:
 - FORGET ME TOOL: If caller asks to delete data ("Mera record delete kar do" or "forget me"), call `forget_caller(query=name_or_id)`.
 
 # DATA FRESHNESS & SPOKEN FAILURE HANDLING
-- DATA FRESHNESS: Always state when the data is from when sharing tool results aloud (e.g., "As of today's 11 August 2026 update...").
+- DATA FRESHNESS: Always state when the data is from when sharing tool results aloud using the data_timestamp returned by the tool (e.g., "As of today's update...").
 - SPOKEN FAILURE HANDLING: If `lookup_nearest_phc` returns an error status, state clearly out loud that the database is unreachable and provide National Emergency Number 108 or Health Line 104 immediately.
 
 # KNOWLEDGE & LIMITATIONS
@@ -108,8 +108,9 @@ Keep the tone respectful, clear, and empathetic.
 
 
 class Assistant(Agent):
-    def __init__(self) -> None:
+    def __init__(self, call_id: str = "default-room") -> None:
         super().__init__(instructions=SYSTEM_PROMPT)
+        self.call_id = call_id
 
     @function_tool()
     async def create_human_help_request(
@@ -141,6 +142,15 @@ class Assistant(Agent):
             preferred_followup: Preferred follow-up method (e.g. 'Phone Call', 'SMS', 'WhatsApp').
             phone_or_contact: Caller phone number or contact details if provided.
         """
+        if user_permission_granted:
+            db.record_call_action(
+                call_id=self.call_id,
+                action_name="Human Escalation Ticket",
+                action_detail=f"Caller: {caller_name}, Reason: {reason_type}",
+            )
+        else:
+            db.mark_call_failure_category(self.call_id, "user_declined_consent")
+
         return escalation_tools.process_human_help_request(
             caller_name=caller_name,
             reason_type=reason_type,
@@ -175,6 +185,12 @@ class Assistant(Agent):
         facts["opt_out_reason"] = reason
         name = existing.get("name") or caller_name_or_id or "Caller"
         db.save_user_profile(user_id=uid, name=name, facts=facts)
+
+        db.record_call_action(
+            call_id=self.call_id,
+            action_name="Opt-Out Registered",
+            action_detail=f"Caller: {name}",
+        )
         return f"Caller {name} has been successfully opted out from future outbound reminder calls."
 
     @function_tool()
@@ -200,6 +216,12 @@ class Assistant(Agent):
         facts["reminder_type"] = reminder_type
         name = existing.get("name") or caller_name_or_id or "Caller"
         db.save_user_profile(user_id=uid, name=name, facts=facts)
+
+        db.record_call_action(
+            call_id=self.call_id,
+            action_name="Follow-up Reminder Scheduled",
+            action_detail=f"Time: {preferred_time}",
+        )
         return f"Outbound follow-up reminder scheduled successfully for {name} at {preferred_time}."
 
     @function_tool()
@@ -267,6 +289,15 @@ class Assistant(Agent):
             pincode: Optional 6-digit postal code.
             simulate_failure: Set to True ONLY if user asks to simulate a network outage or test API failure handling.
         """
+        if simulate_failure:
+            db.mark_call_failure_category(self.call_id, "tool_or_api_error")
+        else:
+            db.record_call_action(
+                self.call_id,
+                "PHC & Health Facility Lookup",
+                f"District: {district}",
+            )
+
         data = health_tools.lookup_health_facility(
             district=district, pincode=pincode, simulate_failure=simulate_failure
         )
@@ -287,6 +318,12 @@ class Assistant(Agent):
             scheme_name: Name of health scheme (e.g. 'Ayushman Bharat', 'PM-JAY').
             category: Socio-economic category or income band.
         """
+        db.record_call_action(
+            self.call_id,
+            "Scheme Eligibility Check",
+            f"Scheme: {scheme_name}",
+        )
+
         data = health_tools.check_scheme_eligibility(
             scheme_name=scheme_name, category=category
         )
@@ -306,6 +343,11 @@ server.setup_fnc = prewarm
 
 @server.rtc_session(agent_name="my-agent")
 async def my_agent(ctx: JobContext):
+    call_id = ctx.room.name or "browser-room"
+    db.log_call_start(
+        call_id=call_id, participant_identity="Browser User", channel="browser"
+    )
+
     # Logging setup
     ctx.log_context_fields = {
         "room": ctx.room.name,
@@ -328,24 +370,27 @@ async def my_agent(ctx: JobContext):
         preemptive_generation=True,
     )
 
-    # Start the session
-    await session.start(
-        agent=Assistant(),
-        room=ctx.room,
-        room_options=room_io.RoomOptions(
-            audio_input=room_io.AudioInputOptions(
-                noise_cancellation=lambda params: (
-                    noise_cancellation.BVCTelephony()
-                    if params.participant.kind
-                    == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
-                    else noise_cancellation.BVC()
+    try:
+        # Start the session
+        await session.start(
+            agent=Assistant(call_id=call_id),
+            room=ctx.room,
+            room_options=room_io.RoomOptions(
+                audio_input=room_io.AudioInputOptions(
+                    noise_cancellation=lambda params: (
+                        noise_cancellation.BVCTelephony()
+                        if params.participant.kind
+                        == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
+                        else noise_cancellation.BVC()
+                    ),
                 ),
             ),
-        ),
-    )
+        )
 
-    # Join the room and connect to the user
-    await ctx.connect()
+        # Join the room and connect to the user
+        await ctx.connect()
+    finally:
+        db.finalize_call(call_id=call_id)
 
 
 if __name__ == "__main__":

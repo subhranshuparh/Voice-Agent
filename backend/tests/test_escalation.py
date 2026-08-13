@@ -1,12 +1,13 @@
 import asyncio
 import os
 
-import db
-import escalation_tools
 import pytest
-from agent import Assistant
 from livekit.agents import AgentSession, llm
 from livekit.plugins import google
+
+import db
+import escalation_tools
+from agent import Assistant
 
 TEST_DB_PATH = "test_escalation_memory.db"
 

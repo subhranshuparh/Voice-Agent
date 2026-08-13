@@ -100,7 +100,7 @@ export const WelcomeView = ({
         </div>
 
         {/* CTA Buttons */}
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <div className="mt-8 flex flex-col flex-wrap items-center justify-center gap-3 sm:flex-row">
           <Button
             size="lg"
             onClick={onStartCall}
@@ -145,7 +145,31 @@ export const WelcomeView = ({
               <path d="M12 8v4" />
               <path d="M12 16h.01" />
             </svg>
-            Escalation Dashboard
+            Escalations
+          </a>
+
+          <a
+            href="/dashboard"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-10 items-center justify-center rounded-full border border-teal-500/40 bg-teal-950/40 px-5 font-mono text-xs font-semibold tracking-wider text-teal-300 uppercase shadow-md shadow-teal-950/50 transition hover:bg-teal-900/60 hover:text-white"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="mr-2 text-teal-300"
+            >
+              <line x1="18" y1="20" x2="18" y2="10" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" />
+            </svg>
+            Call Analytics
           </a>
         </div>
 

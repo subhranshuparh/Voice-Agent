@@ -1,6 +1,8 @@
 import json
 import os
+import random
 import sqlite3
+import uuid
 from typing import Any
 
 DEFAULT_DB_PATH = os.path.abspath(
@@ -9,7 +11,7 @@ DEFAULT_DB_PATH = os.path.abspath(
 
 
 def init_db(db_path: str = DEFAULT_DB_PATH) -> None:
-    """Initialize the SQLite database and users/escalations tables if not existing."""
+    """Initialize the SQLite database and users/escalations/calls tables if not existing."""
     conn = sqlite3.connect(db_path)
     try:
         conn.execute(
@@ -38,6 +40,22 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> None:
                 status TEXT DEFAULT 'open',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS calls (
+                call_id TEXT PRIMARY KEY,
+                participant_identity TEXT DEFAULT 'Browser User',
+                channel TEXT DEFAULT 'browser',
+                status TEXT DEFAULT 'failed',
+                primary_action TEXT DEFAULT 'No Action Taken',
+                failure_category TEXT DEFAULT 'user_hungup_early',
+                actions_taken TEXT DEFAULT '[]',
+                duration_seconds INTEGER DEFAULT 0,
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ended_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
@@ -364,3 +382,285 @@ def update_escalation_status(
         return cur.rowcount > 0
     finally:
         conn.close()
+
+
+# --- DAY 8: CALL ANALYTICS & MONITORING DATABASE FUNCTIONS ---
+
+
+def log_call_start(
+    call_id: str,
+    participant_identity: str = "Browser User",
+    channel: str = "browser",
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Record initial call start session in database."""
+    init_db(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO calls (
+                call_id, participant_identity, channel, status, primary_action,
+                failure_category, actions_taken, duration_seconds, started_at, ended_at
+            ) VALUES (?, ?, ?, 'failed', 'No Action Taken', 'user_hungup_early', '[]', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(call_id) DO UPDATE SET
+                participant_identity = excluded.participant_identity,
+                channel = excluded.channel
+            """,
+            (call_id, participant_identity, channel),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"call_id": call_id, "status": "started"}
+
+
+def record_call_action(
+    call_id: str,
+    action_name: str,
+    action_detail: str = "",
+    db_path: str = DEFAULT_DB_PATH,
+) -> None:
+    """Record an action performed during call session and mark call as successful."""
+    init_db(db_path)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT actions_taken FROM calls WHERE call_id = ?", (call_id,))
+        row = cur.fetchone()
+        actions = []
+        if row and row["actions_taken"]:
+            try:
+                actions = json.loads(row["actions_taken"])
+            except Exception:
+                actions = []
+
+        actions.append({"action": action_name, "detail": action_detail})
+        actions_json = json.dumps(actions, ensure_ascii=False)
+
+        cur.execute(
+            """
+            UPDATE calls
+            SET status = 'successful',
+                primary_action = ?,
+                failure_category = 'none',
+                actions_taken = ?,
+                ended_at = CURRENT_TIMESTAMP
+            WHERE call_id = ?
+            """,
+            (action_name, actions_json, call_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def mark_call_failure_category(
+    call_id: str, category: str, db_path: str = DEFAULT_DB_PATH
+) -> None:
+    """Explicitly assign a failure category to a call ('user_hungup_early', 'user_declined_consent', 'tool_or_api_error', 'no_action_taken')."""
+    init_db(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            UPDATE calls
+            SET failure_category = ?, ended_at = CURRENT_TIMESTAMP
+            WHERE call_id = ?
+            """,
+            (category, call_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def finalize_call(
+    call_id: str,
+    override_status: str | None = None,
+    override_failure_category: str | None = None,
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Finalize a call session, calculating duration and resolving final status."""
+    init_db(db_path)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT call_id, status, primary_action, failure_category, actions_taken,
+                   strftime('%s', 'now') - strftime('%s', started_at) as calculated_duration
+            FROM calls
+            WHERE call_id = ?
+            """,
+            (call_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return {"call_id": call_id, "error": "Call not found"}
+
+        actions = []
+        if row["actions_taken"]:
+            try:
+                actions = json.loads(row["actions_taken"])
+            except Exception:
+                actions = []
+
+        status = override_status or row["status"]
+        failure_category = override_failure_category or row["failure_category"]
+
+        if status == "successful":
+            failure_category = "none"
+        elif not actions and failure_category == "none":
+            failure_category = "user_hungup_early"
+
+        duration = max(5, int(row["calculated_duration"] or 0))
+
+        cur.execute(
+            """
+            UPDATE calls
+            SET status = ?,
+                failure_category = ?,
+                duration_seconds = ?,
+                ended_at = CURRENT_TIMESTAMP
+            WHERE call_id = ?
+            """,
+            (status, failure_category, duration, call_id),
+        )
+        conn.commit()
+        return {
+            "call_id": call_id,
+            "status": status,
+            "failure_category": failure_category,
+            "duration_seconds": duration,
+        }
+    finally:
+        conn.close()
+
+
+def get_call_analytics(
+    limit: int = 50, db_path: str = DEFAULT_DB_PATH
+) -> dict[str, Any]:
+    """Retrieve call metrics (total, successful, failed, success rate, failure categories) and sanitized recent calls list."""
+    init_db(db_path)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) as total_calls FROM calls")
+        total_calls = cur.fetchone()["total_calls"] or 0
+
+        cur.execute(
+            "SELECT COUNT(*) as successful_calls FROM calls WHERE status = 'successful'"
+        )
+        successful_calls = cur.fetchone()["successful_calls"] or 0
+
+        cur.execute(
+            "SELECT COUNT(*) as failed_calls FROM calls WHERE status = 'failed'"
+        )
+        failed_calls = cur.fetchone()["failed_calls"] or 0
+
+        success_rate = (
+            round((successful_calls / total_calls) * 100, 1) if total_calls > 0 else 0.0
+        )
+
+        cur.execute(
+            """
+            SELECT failure_category, COUNT(*) as cnt
+            FROM calls
+            WHERE status = 'failed'
+            GROUP BY failure_category
+            """
+        )
+        failure_rows = cur.fetchall()
+        failure_categories = {
+            "user_hungup_early": 0,
+            "user_declined_consent": 0,
+            "tool_or_api_error": 0,
+            "no_action_taken": 0,
+        }
+        for row in failure_rows:
+            cat = row["failure_category"]
+            if cat in failure_categories:
+                failure_categories[cat] = row["cnt"]
+            else:
+                failure_categories[cat] = row["cnt"]
+
+        cur.execute(
+            """
+            SELECT call_id, participant_identity, channel, status, primary_action,
+                   failure_category, duration_seconds, started_at, ended_at
+            FROM calls
+            ORDER BY started_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+        recent_calls = []
+        for r in rows:
+            recent_calls.append(
+                {
+                    "call_id": r["call_id"],
+                    "participant_identity": r["participant_identity"],
+                    "channel": r["channel"],
+                    "status": r["status"],
+                    "primary_action": r["primary_action"],
+                    "failure_category": r["failure_category"],
+                    "duration_seconds": r["duration_seconds"],
+                    "started_at": r["started_at"],
+                    "ended_at": r["ended_at"],
+                }
+            )
+
+        return {
+            "total_calls": total_calls,
+            "successful_calls": successful_calls,
+            "failed_calls": failed_calls,
+            "success_rate": success_rate,
+            "failure_categories": failure_categories,
+            "recent_calls": recent_calls,
+        }
+    finally:
+        conn.close()
+
+
+def record_test_call(
+    status: str = "successful",
+    primary_action: str = "PHC Lookup",
+    failure_category: str | None = None,
+    channel: str = "browser",
+    db_path: str = DEFAULT_DB_PATH,
+) -> dict[str, Any]:
+    """Helper for testing: log a real test call directly into SQLite database."""
+    init_db(db_path)
+    call_id = f"test-call-{uuid.uuid4().hex[:8]}"
+    duration = random.randint(15, 95)
+
+    if status == "successful":
+        fail_cat = "none"
+        action = primary_action or "PHC & Health Facility Lookup"
+    else:
+        fail_cat = failure_category or random.choice(
+            ["user_hungup_early", "user_declined_consent", "tool_or_api_error"]
+        )
+        action = "No Action Completed"
+
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO calls (
+                call_id, participant_identity, channel, status, primary_action,
+                failure_category, actions_taken, duration_seconds, started_at, ended_at
+            ) VALUES (?, 'Browser User', ?, ?, ?, ?, '[]', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (call_id, channel, status, action, fail_cat, duration),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return get_call_analytics(db_path=db_path)

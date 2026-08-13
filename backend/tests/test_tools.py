@@ -75,4 +75,3 @@ async def test_schedule_followup_reminder_unit():
     profile = db.get_user_profile("sunita_devi")
     assert profile is not None
     assert profile["facts"]["next_reminder"] == "Tomorrow 10 AM"
-

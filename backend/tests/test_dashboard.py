@@ -21,7 +21,9 @@ def temp_db():
 def test_call_analytics_flow(temp_db):
     # 1. Log call start
     call_1 = "test-call-001"
-    start_res = db.log_call_start(call_1, participant_identity="User 1", channel="browser", db_path=temp_db)
+    start_res = db.log_call_start(
+        call_1, participant_identity="User 1", channel="browser", db_path=temp_db
+    )
     assert start_res["call_id"] == call_1
 
     # Record action (successful call)
@@ -32,7 +34,9 @@ def test_call_analytics_flow(temp_db):
 
     # 2. Log failed call (user hung up early)
     call_2 = "test-call-002"
-    db.log_call_start(call_2, participant_identity="User 2", channel="sip", db_path=temp_db)
+    db.log_call_start(
+        call_2, participant_identity="User 2", channel="sip", db_path=temp_db
+    )
     db.mark_call_failure_category(call_2, "user_hungup_early", db_path=temp_db)
     final_2 = db.finalize_call(call_2, db_path=temp_db)
     assert final_2["status"] == "failed"

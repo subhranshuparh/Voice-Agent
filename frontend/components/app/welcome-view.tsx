@@ -81,22 +81,24 @@ export const WelcomeView = ({
           prepare for your doctor visits — all through voice.
         </p>
 
-        {/* Language support badge */}
-        <div className="border-primary/20 bg-primary/5 mt-4 flex items-center gap-2 rounded-full border px-4 py-1.5">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-primary">
-            <path
-              d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            />
-            <path d="M2 12H22" stroke="currentColor" strokeWidth="1.5" />
-            <path
-              d="M12 2C14.5 4.5 16 8 16 12C16 16 14.5 19.5 12 22C9.5 19.5 8 16 8 12C8 8 9.5 4.5 12 2Z"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            />
-          </svg>
-          <span className="text-primary text-xs font-medium">Speaks English, Hindi & Hinglish</span>
+        {/* Language & Specialist Voices Badges */}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <div className="border-primary/20 bg-primary/5 flex items-center gap-2 rounded-full border px-3 py-1">
+            <span className="bg-primary size-2 animate-ping rounded-full" />
+            <span className="text-primary text-xs font-semibold">
+              Anisha — Main Health Assistant
+            </span>
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1">
+            <span className="size-2 rounded-full bg-teal-400" />
+            <span className="text-xs font-semibold text-teal-300">
+              Pooja — Appointment Specialist
+            </span>
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1">
+            <span className="size-2 rounded-full bg-amber-400" />
+            <span className="text-xs font-semibold text-amber-300">Samar — Scheme Specialist</span>
+          </div>
         </div>
 
         {/* CTA Buttons */}

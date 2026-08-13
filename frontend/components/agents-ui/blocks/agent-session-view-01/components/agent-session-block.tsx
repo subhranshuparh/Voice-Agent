@@ -2,7 +2,12 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, type MotionProps, motion } from 'motion/react';
-import { useAgent, useSessionContext, useSessionMessages } from '@livekit/components-react';
+import {
+  type ReceivedMessage,
+  useAgent,
+  useSessionContext,
+  useSessionMessages,
+} from '@livekit/components-react';
 import { AgentChatTranscript } from '@/components/agents-ui/agent-chat-transcript';
 import {
   AgentControlBar,
@@ -15,10 +20,47 @@ import { TileLayout } from './tile-view';
 const MotionMessage = motion.create(Shimmer);
 
 /** Maps the LiveKit agent state to a user-friendly status display. */
-function AgentStateIndicator({ state }: { state: string }) {
+function getActiveAgentInfo(messages: ReceivedMessage[] = []) {
+  const assistantMsgs = messages.filter((m) => !m?.from?.isLocal);
+  const lastMsg = assistantMsgs.at(-1)?.message || '';
+  const text = typeof lastMsg === 'string' ? lastMsg.toLowerCase() : '';
+
+  if (
+    text.includes('appointment specialist') ||
+    text.includes('clinic & appointment') ||
+    text.includes('apt-')
+  ) {
+    return {
+      name: 'Pooja',
+      role: 'Clinic & Appointment Specialist',
+      badgeColor: 'border-teal-500/40 bg-teal-500/10 text-teal-300',
+    };
+  }
+  if (text.includes('scheme specialist') || text.includes('government health scheme')) {
+    return {
+      name: 'Samar',
+      role: 'Government Health Scheme Specialist',
+      badgeColor: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
+    };
+  }
+  return {
+    name: 'Anisha',
+    role: 'Main Health Assistant',
+    badgeColor: 'border-primary/30 bg-primary/10 text-primary',
+  };
+}
+
+function AgentStateIndicator({
+  state,
+  messages = [],
+}: {
+  state: string;
+  messages?: ReceivedMessage[];
+}) {
+  const activeAgent = getActiveAgentInfo(messages);
   const stateConfig: Record<string, { label: string; icon: string; animate: boolean }> = {
     listening: { label: 'Listening to you...', icon: '🎧', animate: true },
-    speaking: { label: 'Aarogya Mitra is speaking...', icon: '🗣️', animate: true },
+    speaking: { label: `${activeAgent.name} is speaking...`, icon: '🗣️', animate: true },
     thinking: { label: 'Thinking...', icon: '💭', animate: true },
     idle: { label: 'Ready to help', icon: '💚', animate: false },
     connecting: { label: 'Connecting...', icon: '🔗', animate: true },
@@ -27,23 +69,45 @@ function AgentStateIndicator({ state }: { state: string }) {
   const config = stateConfig[state] ?? stateConfig.idle;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="border-primary/15 bg-primary/5 mx-auto flex items-center gap-2 rounded-full border px-4 py-1.5"
-    >
-      {config.animate && (
-        <motion.span
-          className="bg-primary inline-block size-2 rounded-full"
-          animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.1, 0.8] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-        />
-      )}
-      {!config.animate && <span className="bg-primary/50 inline-block size-2 rounded-full" />}
-      <span className="text-primary text-xs font-medium">
-        {config.icon} {config.label}
-      </span>
-    </motion.div>
+    <div className="flex flex-col items-center justify-center gap-2">
+      {/* Active Specialist Badge */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        key={activeAgent.name}
+        className={cn(
+          'flex items-center gap-2 rounded-full border px-3 py-1 shadow-sm backdrop-blur-sm',
+          activeAgent.badgeColor
+        )}
+      >
+        <span className="relative flex size-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75" />
+          <span className="relative inline-flex size-2 rounded-full bg-current" />
+        </span>
+        <span className="font-mono text-xs font-bold tracking-wide">
+          Agent Voice: {activeAgent.name} ({activeAgent.role})
+        </span>
+      </motion.div>
+
+      {/* Agent Activity State */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="border-primary/15 bg-primary/5 flex items-center gap-2 rounded-full border px-4 py-1"
+      >
+        {config.animate && (
+          <motion.span
+            className="bg-primary inline-block size-2 rounded-full"
+            animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.1, 0.8] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          />
+        )}
+        {!config.animate && <span className="bg-primary/50 inline-block size-2 rounded-full" />}
+        <span className="text-primary text-xs font-medium">
+          {config.icon} {config.label}
+        </span>
+      </motion.div>
+    </div>
   );
 }
 
@@ -276,7 +340,7 @@ export function AgentSessionView_01({
       >
         {/* Agent state indicator — shows Listening / Speaking / Thinking */}
         <div className="mx-auto mb-3 w-full max-w-2xl">
-          <AgentStateIndicator state={agentState} />
+          <AgentStateIndicator state={agentState} messages={messages} />
         </div>
         {/* Pre-connect message */}
         {isPreConnectBufferEnabled && (

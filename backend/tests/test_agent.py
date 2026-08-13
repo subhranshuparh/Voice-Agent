@@ -206,3 +206,79 @@ async def test_scheme_eligibility_lookup() -> None:
                 """,
             )
         )
+
+
+@pytest.mark.asyncio
+async def test_normal_query_stays_with_main_agent() -> None:
+    """Evaluation Day 9 (Path 1): Normal health access query stays with Assistant without triggering specialist handoff."""
+    await asyncio.sleep(12)  # Avoid rate limiting
+    async with (
+        _llm() as llm_instance,
+        AgentSession(llm=llm_instance) as session,
+    ):
+        await session.start(Assistant())
+
+        result = await session.run(
+            user_input="Patna mein nearest Primary Health Centre kaun sa hai?"
+        )
+
+        result.expect.next_event().is_function_call(name="lookup_nearest_phc")
+        result.expect.next_event().is_function_call_output()
+        await (
+            result.expect.next_event()
+            .is_message(role="assistant")
+            .judge(
+                llm_instance,
+                intent="""
+                Provides details for Patna PHC without invoking transfer_to_appointment_specialist tool.
+                """,
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_handoff_to_appointment_specialist() -> None:
+    """Evaluation Day 9 (Path 2): Appointment booking query triggers transfer_to_appointment_specialist tool."""
+    await asyncio.sleep(12)  # Avoid rate limiting
+    async with (
+        _llm() as llm_instance,
+        AgentSession(llm=llm_instance) as session,
+    ):
+        await session.start(Assistant())
+
+        result = await session.run(
+            user_input="Mujhe Patna PHC mein kal subah 10 baje doctor appointment book karna hai. Patient name Rahul Sharma."
+        )
+
+        event = result.expect.next_event()
+        try:
+            event.is_function_call(name="transfer_to_appointment_specialist")
+        except AssertionError:
+            result.expect.next_event().is_function_call(
+                name="transfer_to_appointment_specialist"
+            )
+        result.expect.next_event().is_function_call_output()
+
+
+@pytest.mark.asyncio
+async def test_handoff_to_scheme_specialist() -> None:
+    """Evaluation Day 9: Complex Ayushman Bharat scheme inquiry triggers transfer_to_scheme_specialist tool."""
+    await asyncio.sleep(12)  # Avoid rate limiting
+    async with (
+        _llm() as llm_instance,
+        AgentSession(llm=llm_instance) as session,
+    ):
+        await session.start(Assistant())
+
+        result = await session.run(
+            user_input="Mujhe Ayushman Bharat PM-JAY scheme ke ₹5 Lakh health card benefits ke baare mein Scheme Specialist se baat karni hai."
+        )
+
+        event = result.expect.next_event()
+        try:
+            event.is_function_call(name="transfer_to_scheme_specialist")
+        except AssertionError:
+            result.expect.next_event().is_function_call(
+                name="transfer_to_scheme_specialist"
+            )
+        result.expect.next_event().is_function_call_output()

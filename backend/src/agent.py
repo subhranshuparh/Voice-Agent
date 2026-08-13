@@ -8,6 +8,7 @@ from livekit.agents import (
     Agent,
     AgentServer,
     AgentSession,
+    ChatContext,
     JobContext,
     JobProcess,
     RunContext,
@@ -69,10 +70,17 @@ A successful call achieves one or more of the following:
 4. Human Escalation & Support: Identify complex medical triage or hospital disputes, obtain caller consent, and generate human help requests with reference IDs.
 5. Rescheduling & Opt-Out Handling: Gracefully reschedule calls when requested or process immediate opt-outs.
 
+# DAY 9: SPECIALIST HANDOFF RULES (CRITICAL)
+- SPECIALIST HANDOFF FOR APPOINTMENTS & SCHEDULING:
+  - Whenever the caller asks to book, schedule, reschedule, cancel, or check available doctor/clinic slots:
+    - YOU MUST IMMEDIATELY CALL THE FUNCTION TOOL `transfer_to_appointment_specialist` as your primary tool call action.
+    - Do not output plain conversational text before calling `transfer_to_appointment_specialist`.
+
 # PERSISTENT MEMORY & TOOLS
 - Memory Tools: `lookup_caller`, `save_caller_info`, and `forget_caller`.
 - Outbound & Follow-up Tools: `opt_out_stop_calling` and `schedule_followup_reminder`.
 - Domain Lookup Tools: `lookup_nearest_phc` and `check_scheme_eligibility`.
+- Specialist Handoff Tool: `transfer_to_appointment_specialist`.
 - Human Help Escalation Tool: `create_human_help_request`.
 - HUMAN HELP TOOL (`create_human_help_request`): Invoke ONLY after obtaining explicit caller permission when human intervention is needed.
 - OPT-OUT TOOL (`opt_out_stop_calling`): If caller says "stop calling", "opt out", "stop", or "mujhe call mat karo", call `opt_out_stop_calling` IMMEDIATELY.
@@ -107,10 +115,255 @@ Keep the tone respectful, clear, and empathetic.
 """
 
 
+APPOINTMENT_SPECIALIST_PROMPT = """# IDENTITY & ROLE
+You are the Clinic and Appointment Specialist for Bharat Health Access Initiative (#VoiceForBharat). Your single, focused job is to schedule, book, manage, confirm, or check available time slots for primary health centre (PHC) doctor consultations, clinic appointments, and vaccination slots for citizens.
+
+# OBJECTIVES & WORKFLOW
+- When taking over the call, introduce yourself clearly as the Clinic & Appointment Specialist.
+- Collect or confirm booking details: patient name, preferred clinic/PHC location or district, date, and preferred time slot.
+- Use `check_available_slots` to look up clinic slot availability.
+- Use `book_clinic_appointment` to finalize the appointment and generate a unique appointment reference ID (e.g. APT-XXXXX).
+- Read the generated appointment reference ID clearly to the user once confirmed.
+
+# LANGUAGE & SCRIPT
+Always write every language in its own native script. Hindi → Devanagari (नमस्ते), never romanized (never "namaste").
+Same rule for all non-English languages.
+
+# GUARDRAILS & LIMITATIONS
+- Focus strictly on appointment scheduling, clinic slots, and booking confirmations.
+- If asked about medical diagnoses or prescription drugs, state politely: "Main doctor nahi hu aur dawa prescribe nahi kar sakta. Kripya consult ke silsile mein appointment schedule karein."
+
+# STYLE & OUTPUT RULES
+- Voice-First Output: Speak aloud via Murf Falcon text-to-speech.
+- Plain text ONLY: No bullet points, bold text, lists, markdown tables, or emojis.
+- Keep responses brief: 1 to 2 short sentences per turn.
+"""
+
+
+SCHEME_SPECIALIST_PROMPT = """# IDENTITY & ROLE
+You are the Government Health Scheme Specialist for Bharat Health Access Initiative (#VoiceForBharat). Your single, focused job is to guide citizens on public health scheme eligibility (such as Ayushman Bharat PM-JAY, AB-PMJAY Golden Card, State Health Insurance), required documents (Aadhaar, Ration Card), and coverage benefits up to ₹5 Lakhs.
+
+# OBJECTIVES & WORKFLOW
+- When taking over the call, introduce yourself clearly as the Government Health Scheme Specialist.
+- Explain scheme coverage benefits, eligibility criteria, e-KYC steps, and required documents.
+- Use `check_scheme_eligibility` tool to verify eligibility guidelines.
+
+# LANGUAGE & SCRIPT
+Always write every language in its own native script. Hindi → Devanagari (नमस्ते), never romanized (never "namaste").
+Same rule for all non-English languages.
+
+# GUARDRAILS & LIMITATIONS
+- Focus strictly on government health schemes and benefit coverage.
+- If asked to book appointments, transfer or advise scheduling with the Clinic & Appointment Specialist.
+
+# STYLE & OUTPUT RULES
+- Voice-First Output: Speak aloud via Murf Falcon text-to-speech.
+- Plain text ONLY: No bullet points, bold text, lists, markdown tables, or emojis.
+- Keep responses brief: 1 to 2 short sentences per turn.
+"""
+
+
+class SchemeSpecialistAgent(Agent):
+    def __init__(
+        self, chat_ctx: ChatContext | None = None, call_id: str = "default-room"
+    ) -> None:
+        super().__init__(
+            instructions=SCHEME_SPECIALIST_PROMPT,
+            chat_ctx=chat_ctx,
+            tts=murf.TTS(
+                voice="Samar",
+                style="Conversation",
+                tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
+                text_pacing=True,
+            ),
+        )
+        self.call_id = call_id
+
+    async def on_enter(self) -> None:
+        await self.session.generate_reply(
+            instructions="Introduce yourself as the Government Health Scheme Specialist for Bharat Health Access Initiative. Acknowledge the user's scheme inquiry and offer to guide them through Ayushman Bharat eligibility and benefits."
+        )
+
+    @function_tool()
+    async def check_scheme_eligibility(
+        self,
+        context: RunContext,
+        scheme_name: str = "Ayushman Bharat",
+        category: str = "",
+    ) -> str:
+        """Look up coverage benefits, eligibility criteria, required documents (Aadhaar, Ration Card), and application process for government health schemes like Ayushman Bharat (PM-JAY).
+
+        Args:
+            scheme_name: Name of health scheme (e.g. 'Ayushman Bharat', 'PM-JAY').
+            category: Socio-economic category or income band.
+        """
+        db.record_call_action(
+            self.call_id,
+            "Specialist Scheme Eligibility Check",
+            f"Scheme: {scheme_name}",
+        )
+
+        data = health_tools.check_scheme_eligibility(
+            scheme_name=scheme_name, category=category
+        )
+        return json.dumps(data, ensure_ascii=False)
+
+
+class AppointmentSpecialistAgent(Agent):
+    def __init__(
+        self, chat_ctx: ChatContext | None = None, call_id: str = "default-room"
+    ) -> None:
+        super().__init__(
+            instructions=APPOINTMENT_SPECIALIST_PROMPT,
+            chat_ctx=chat_ctx,
+            tts=murf.TTS(
+                voice="Pooja",
+                style="Conversation",
+                tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
+                text_pacing=True,
+            ),
+        )
+        self.call_id = call_id
+
+    async def on_enter(self) -> None:
+        await self.session.generate_reply(
+            instructions="Introduce yourself as the Clinic & Appointment Specialist for Bharat Health Access Initiative. Acknowledge the user's booking request and ask how you can help schedule their appointment or vaccination slot."
+        )
+
+    @function_tool()
+    async def check_available_slots(
+        self,
+        context: RunContext,
+        clinic_or_district: str,
+        preferred_date: str = "tomorrow",
+    ) -> str:
+        """Check available doctor consultation and clinic appointment slots for a given PHC, clinic, or district.
+
+        Args:
+            clinic_or_district: Name of PHC, clinic, or district city (e.g. 'Patna PHC', 'Varanasi', 'Lucknow UPHC').
+            preferred_date: Preferred date or day (e.g. 'today', 'tomorrow', 'Monday').
+        """
+        slots = [
+            "09:30 AM - General OPD",
+            "11:00 AM - Maternal & Child Health",
+            "02:00 PM - Doctor Consultation",
+            "04:30 PM - Routine Vaccination",
+        ]
+        db.record_call_action(
+            call_id=self.call_id,
+            action_name="Checked Appointment Slots",
+            action_detail=f"Facility: {clinic_or_district}, Date: {preferred_date}",
+        )
+        return json.dumps(
+            {
+                "status": "available",
+                "facility": clinic_or_district,
+                "date": preferred_date,
+                "available_slots": slots,
+                "data_timestamp": "2026-08-13 23:30 IST",
+            },
+            ensure_ascii=False,
+        )
+
+    @function_tool()
+    async def book_clinic_appointment(
+        self,
+        context: RunContext,
+        patient_name: str,
+        clinic_name: str,
+        preferred_date: str,
+        preferred_time: str,
+        department: str = "General OPD",
+    ) -> str:
+        """Book and confirm a clinic appointment or vaccination slot for a patient, returning a unique appointment reference ID.
+
+        Args:
+            patient_name: Name of the patient.
+            clinic_name: Name of the PHC, CHC, or hospital clinic.
+            preferred_date: Appointment date (e.g. 'tomorrow', '15th August').
+            preferred_time: Preferred time slot (e.g. '10:00 AM').
+            department: Medical department (e.g. 'General OPD', 'Vaccination', 'Pediatrics', 'Dental').
+        """
+        import random
+
+        apt_id = f"APT-{random.randint(10000, 99999)}"
+
+        uid = patient_name.lower().strip().replace(" ", "_")
+        existing = db.get_user_profile(uid) or {}
+        facts = existing.get("facts", {})
+        facts["last_appointment"] = {
+            "appointment_id": apt_id,
+            "clinic": clinic_name,
+            "date": preferred_date,
+            "time": preferred_time,
+            "department": department,
+        }
+        db.save_user_profile(user_id=uid, name=patient_name, facts=facts)
+
+        db.record_call_action(
+            call_id=self.call_id,
+            action_name="Booked Clinic Appointment",
+            action_detail=f"ID: {apt_id}, Patient: {patient_name}, Facility: {clinic_name}, Time: {preferred_date} {preferred_time}",
+        )
+
+        return json.dumps(
+            {
+                "status": "confirmed",
+                "appointment_id": apt_id,
+                "patient_name": patient_name,
+                "clinic_name": clinic_name,
+                "date": preferred_date,
+                "time": preferred_time,
+                "department": department,
+                "message": f"Appointment successfully booked with reference ID {apt_id}.",
+            },
+            ensure_ascii=False,
+        )
+
+    @function_tool()
+    async def transfer_back_to_main_assistant(
+        self, context: RunContext
+    ) -> tuple[Agent, str]:
+        """Transfer the caller back to the main Aarogya Mitra assistant when appointment booking is complete or the user asks general healthcare questions."""
+        main_agent = Assistant(call_id=self.call_id)
+        return (
+            main_agent,
+            "Main aapko hamare Main Health Assistant se wapas connect kar raha hu.",
+        )
+
+
 class Assistant(Agent):
     def __init__(self, call_id: str = "default-room") -> None:
         super().__init__(instructions=SYSTEM_PROMPT)
         self.call_id = call_id
+
+    @function_tool()
+    async def transfer_to_appointment_specialist(
+        self, context: RunContext
+    ) -> tuple[Agent, str]:
+        """Transfer the caller to our Clinic and Appointment Specialist whenever the caller asks to book, schedule, reschedule, cancel, or check slots for a clinic appointment, doctor consultation, or vaccination slot."""
+        specialist = AppointmentSpecialistAgent(
+            chat_ctx=self.chat_ctx.copy(exclude_instructions=True),
+            call_id=self.call_id,
+        )
+        return (
+            specialist,
+            "Main aapko hamare Clinic aur Appointment Specialist se connect kar raha hu.",
+        )
+
+    @function_tool()
+    async def transfer_to_scheme_specialist(
+        self, context: RunContext
+    ) -> tuple[Agent, str]:
+        """Transfer the caller to our Government Health Scheme Specialist whenever the caller asks in detail about Ayushman Bharat, PM-JAY eligibility, scheme coverage limits, or required documents."""
+        specialist = SchemeSpecialistAgent(
+            chat_ctx=self.chat_ctx.copy(exclude_instructions=True),
+            call_id=self.call_id,
+        )
+        return (
+            specialist,
+            "Main aapko hamare Government Health Scheme Specialist se connect kar raha hu.",
+        )
 
     @function_tool()
     async def create_human_help_request(

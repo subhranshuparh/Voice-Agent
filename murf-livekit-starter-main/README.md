@@ -1,44 +1,8 @@
-# Aarogya Mitra — Voice Health Agent for Bharat 🇮🇳
-
-> **Built as part of [10 Days of Voice Agents — #VoiceForBharat Edition](https://discord.gg/FbKAy96Sz7)**
-
-An empathetic voice AI health access assistant that helps Indian citizens navigate healthcare services, locate nearby Primary Health Centres (PHCs), check Ayushman Bharat / PM-JAY eligibility, book clinic appointments, and escalate complex cases to human supervisors — all over voice, in Hindi and Hinglish.
-
-[![Blog Post](https://img.shields.io/badge/Blog-DEV%20Community-0A0A0A?logo=dev.to&logoColor=white)](https://dev.to/subhranshu/i-built-a-voice-health-agent-for-bharat-in-10-days-1oaa) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Murf Falcon](https://img.shields.io/badge/TTS-Murf%20Falcon-6366F1)](https://murf.ai/api/docs/text-to-speech/streaming) [![LiveKit](https://img.shields.io/badge/Transport-LiveKit-002cf2)](https://docs.livekit.io) [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-
-📖 **Read the full build story:** [I Built a Voice Health Agent for Bharat in 10 Days](https://dev.to/subhranshu/i-built-a-voice-health-agent-for-bharat-in-10-days-1oaa)
-
----
-
-## About This Project
-
-**Aarogya Mitra** (आरोग्य मित्र) is a production-grade voice agent built on the [murf-livekit-starter](https://github.com/murf-ai/murf-livekit-starter) template. It uses:
-
-- 🎙️ **Deepgram Nova-3** — multilingual STT (Hindi + English code-mix)
-- 🤖 **Google Gemini** — LLM for reasoning and tool calls
-- 🔊 **Murf Falcon TTS** — Anisha (Indian English), 55ms model latency
-- 📡 **LiveKit** — real-time WebRTC + SIP telephony transport
-- 🗄️ **SQLite** — persistent caller memory, call analytics, escalation tickets
-
-### Key Features Built (10-Day Challenge)
-
-| Day | Feature |
-|-----|---------|
-| 1-2 | Core voice pipeline (STT → LLM → TTS), Indian voice (Anisha), system prompt |
-| 3 | Safety guardrails — hard refusal for diagnosis/prescription, emergency 108 script |
-| 4 | Domain tools — PHC lookup, Ayushman Bharat scheme eligibility |
-| 5 | Multilingual turn detection, graceful API failure handling |
-| 6 | Outbound calls + CSV campaign dialer, opt-out handling |
-| 7 | Human escalation with consent gate, reference IDs, Discord webhook, data sanitization |
-| 8 | Call analytics — success rate, failure categories, per-call action logging |
-| 9 | Multi-agent handoff — Appointment Specialist (Pooja voice), Scheme Specialist (Samar voice) |
-| 10 | Blog post, architecture diagram, documentation |
-
----
-
-## Voice Agent Starter — Powered by Murf Falcon
+# Voice Agent Starter — Powered by Murf Falcon
 
 Build a production voice AI agent in 5 minutes. Powered by the fastest TTS on the market - swap the system prompt to build anything from customer support to language tutors.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Murf Falcon](https://img.shields.io/badge/TTS-Murf%20Falcon-6366F1)](https://murf.ai/api/docs/text-to-speech/streaming) [![LiveKit](https://img.shields.io/badge/Transport-LiveKit-002cf2)](https://docs.livekit.io) [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
 ---
 
@@ -102,14 +66,14 @@ cd murf-livekit-starter
 
 Create `.env.local` in both `backend/` and `frontend/` (copy from `.env.example` in each). You need:
 
-| Variable | Where to get it | Required |
-|----------|-----------------|----------|
-| `LIVEKIT_URL` | LiveKit Cloud dashboard | Yes |
-| `LIVEKIT_API_KEY` | LiveKit Cloud dashboard | Yes |
-| `LIVEKIT_API_SECRET` | LiveKit Cloud dashboard | Yes |
-| `MURF_API_KEY` | [murf.ai/api/dashboard](https://murf.ai/api/dashboard) | Yes |
-| `DEEPGRAM_API_KEY` | [deepgram.com](https://deepgram.com) | Yes |
-| `GOOGLE_API_KEY` (or `OPENAI_API_KEY`) | Depends on LLM choice | Yes |
+| Variable                               | Where to get it                                        | Required |
+| -------------------------------------- | ------------------------------------------------------ | -------- |
+| `LIVEKIT_URL`                          | LiveKit Cloud dashboard                                | Yes      |
+| `LIVEKIT_API_KEY`                      | LiveKit Cloud dashboard                                | Yes      |
+| `LIVEKIT_API_SECRET`                   | LiveKit Cloud dashboard                                | Yes      |
+| `MURF_API_KEY`                         | [murf.ai/api/dashboard](https://murf.ai/api/dashboard) | Yes      |
+| `DEEPGRAM_API_KEY`                     | [deepgram.com](https://deepgram.com)                   | Yes      |
+| `GOOGLE_API_KEY` (or `OPENAI_API_KEY`) | Depends on LLM choice                                  | Yes      |
 
 ### Step 3: Install backend dependencies
 
@@ -234,16 +198,68 @@ See the Configuration section below for voice, STT, and LLM options.
 
 ---
 
+## Telephony
+
+Give your agent a phone number. The same Murf Falcon pipeline that powers the browser agent can answer incoming calls or place outgoing ones.
+
+```mermaid
+flowchart LR
+    A[📞 Caller] -->|PSTN| B[SIP provider]
+    B -->|SIP| C[LiveKit]
+    C -->|audio| D[🤖 Your agent]
+
+    style A fill:#444441,stroke:#888780,color:#fff
+    style B fill:#185FA5,stroke:#85B7EB,color:#fff
+    style C fill:#D85A30,stroke:#F0997B,color:#fff
+    style D fill:#0F6E56,stroke:#5DCAA5,color:#fff
+```
+
+Two self-contained starters live in [`backend/src/telephony/`](./backend/src/telephony/) — copy either folder and build on it.
+
+### [`inbound/`](./backend/src/telephony/inbound/) — answer incoming calls
+
+Someone dials your number and the agent picks up. It reads the caller's number from the SIP participant, greets them, and can transfer to a colleague or hang up when the conversation ends.
+
+```bash
+uv run python src/telephony/inbound/agent.py dev
+```
+
+### [`outbound/`](./backend/src/telephony/outbound/) — place outgoing calls
+
+You trigger a call and the agent dials out, starting the conversation as soon as someone picks up. It recognises voicemail and hangs up instead of talking to a machine.
+
+```bash
+uv run python src/telephony/outbound/agent.py dev              # worker
+uv run python src/telephony/outbound/dial.py --to +15551234567  # place a call
+```
+
+### Setup
+
+Run all commands from the `backend/` directory. Three steps:
+
+1. **Get a phone number** from a SIP provider ([Twilio](https://www.twilio.com/docs/sip-trunking) or any other) and point it at LiveKit
+2. **Create a LiveKit SIP trunk** from the JSON templates included in each folder — `lk sip inbound create …`
+3. **Create a dispatch rule** so LiveKit knows which agent answers (inbound only)
+
+Full walkthrough, environment variables, and troubleshooting: **[backend/src/telephony/README.md](./backend/src/telephony/README.md)**
+
+> **Note:** Phone numbers are billed by your SIP provider, and some countries require identity or business verification before one is issued. Factor that into your timeline.
+
+---
+
 ## Configuration
 
 ### Murf voice
 
 Edit the `tts=murf.TTS(...)` call in `backend/src/agent.py`. Set the `voice` argument to any Murf voice ID. Examples:
 
-- `en-US-natalie` — US English (female)
-- `en-UK-ruby` — UK English (female)
-- `en-US-miles` — US English (male)
-- `en-US-matthew` — US English (male, default in this starter)
+- `Anisha` — Indian English (female, default in this starter)
+- `Pooja` — Indian English (female)
+- `Samar` — Indian English (male)
+- `Amara` — US English (female)
+- `Gordon` — US English (male)
+- `Hazel` — UK English (female)
+- `Bertie` — UK English (male)
 
 Browse all voices: [Murf Voice Library](https://murf.ai/api/docs/voices-styles/voice-library).
 
@@ -253,7 +269,7 @@ STT is configured in `backend/src/agent.py` in the `AgentSession(stt=...)` call.
 
 ### LLM (Gemini vs OpenAI)
 
-- **Gemini (default):** Set `GOOGLE_API_KEY` and use `llm=google.LLM(model="gemini-2.5-flash")` in `agent.py`.
+- **Gemini (default):** Set `GOOGLE_API_KEY` and use `llm=google.LLM(model="gemini-3.5-flash-lite")` in `agent.py`.
 - **OpenAI:** Set `OPENAI_API_KEY`, add the OpenAI plugin, and use the corresponding `llm=openai.LLM(...)` in `agent.py`.
 
 ### Audio format
@@ -268,7 +284,10 @@ Murf Falcon and LiveKit handle audio format internally. For advanced options, se
 murf-livekit-starter/
 ├── backend/                 # Python voice agent (LiveKit Agents + Murf Falcon)
 │   ├── src/
-│   │   └── agent.py         # Agent entrypoint, pipeline (STT/LLM/TTS), system prompt
+│   │   ├── agent.py         # Agent entrypoint, pipeline (STT/LLM/TTS), system prompt
+│   │   └── telephony/       # Optional — phone call agents (see its README)
+│   │       ├── inbound/     # Answers incoming calls
+│   │       └── outbound/    # Places outgoing calls
 │   ├── tests/               # Agent tests
 │   ├── .env.example         # Backend env template
 │   ├── pyproject.toml       # Python deps (uv)
@@ -289,47 +308,42 @@ murf-livekit-starter/
 For deeper documentation on each part, see:
 
 - [Backend Documentation](./backend/README.md) — agent pipeline, voice/LLM/STT configuration, testing, deployment
+- [Telephony Documentation](./backend/src/telephony/README.md) — SIP trunks, dispatch rules, inbound and outbound calls
 - [Frontend Documentation](./frontend/README.md) — UI customization, visualizers, theming, component architecture
 
 ---
 
 ## Links
 
+**Murf**
+
+- [Murf Falcon 2](https://murf.ai/api/docs/text-to-speech-models/falcon-2) — the streaming TTS model this starter uses
+- [Murf Falcon](https://murf.ai/falcon) — product overview and latency numbers
 - [Murf API Docs](https://murf.ai/api/docs)
-- [Murf Voice Library](https://murf.ai/api/docs/voices-styles/voice-library)
-- [LiveKit Docs](https://docs.livekit.io)
-- [Deepgram Docs](https://developers.deepgram.com)
+- [Murf Voice Library](https://murf.ai/api/docs/voices-styles/voice-library) — 150+ voices across 35+ languages
 - [Murf Falcon Benchmarks](https://murf.ai/falcon/benchmarks)
-- [TTS Latency Benchmarker](https://github.com/sahilsgupta/tts-latency-benchmarker) — run your own p50/p95 tests across providers
 - [Murf Discord](https://discord.gg/FbKAy96Sz7)
 - [Murf Startup Incubator](https://murf.ai/api) — 50M free characters for startups
 
----
+**Telephony**
 
-## Day 5 — The Tools (#VoiceForBharat Health Access Agent)
+- [Telephony Setup Guide](./backend/src/telephony/README.md) — inbound and outbound calls in this repo
+- [LiveKit SIP Docs](https://docs.livekit.io/sip/) — trunks, dispatch rules, call lifecycle
+- [Accepting Inbound Calls](https://docs.livekit.io/sip/accepting-calls/)
+- [Making Outbound Calls](https://docs.livekit.io/sip/making-calls/)
+- [SIP Dispatch Rules](https://docs.livekit.io/sip/dispatch-rule/)
+- [Agent Dispatch](https://docs.livekit.io/agents/server/agent-dispatch/) — how agents get routed to calls
+- [SIP Troubleshooting](https://docs.livekit.io/reference/telephony/troubleshooting/)
+- [Twilio Elastic SIP Trunking](https://www.twilio.com/docs/sip-trunking) — the provider used in the examples
 
-For **Day 5 – The Tools**, **Aarogya Mitra** (Health Access Track) was enhanced with real-time health domain function tools:
+**Other**
 
-### Tools Implemented
-1. **`lookup_nearest_phc(district, pincode, simulate_failure)`**:
-   - Locates government Primary Health Centres (PHCs), Community Health Centres (CHCs), District Hospitals, OPD hours, doctor availability, bed counts, emergency 108 status, and helpline numbers.
-   - **Data Freshness (Step 5)**: Explicitly returns `data_timestamp` ("10 August 2026, 08:00 AM IST") which the agent speaks naturally aloud.
-   - **Spoken Failure Handling (Step 4)**: If network timeout or API outage occurs (`simulate_failure=True`), the tool returns structured error context, instructing the agent to speak a reassuring fallback with national emergency numbers (108 / 104) instead of remaining silent or hallucinating.
-2. **`check_scheme_eligibility(scheme_name, category)`**:
-   - Queries Ayushman Bharat (PM-JAY) coverage up to ₹5 Lakhs per family, eligibility criteria, required documents (Aadhaar, Ration Card), and application process.
-3. **Tool Chaining (Advanced)**:
-   - Connects with Day 4 SQLite caller memory (`lookup_caller`). If a returning user asks for a health facility without re-stating their district, the agent retrieves their saved location from memory and calls `lookup_nearest_phc` automatically.
-
-### Running Tool Tests
-```bash
-cd backend
-uv run pytest tests/test_tools.py
-uv run pytest tests/test_agent.py
-```
+- [LiveKit Docs](https://docs.livekit.io)
+- [Deepgram Docs](https://developers.deepgram.com)
+- [TTS Latency Benchmarker](https://github.com/sahilsgupta/tts-latency-benchmarker) — run your own p50/p95 tests across providers
 
 ---
 
 ## License
 
 MIT
-
